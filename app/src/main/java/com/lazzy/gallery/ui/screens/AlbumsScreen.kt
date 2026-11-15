@@ -566,6 +566,8 @@ fun AlbumCard(
             .size(300, 300)
             .precision(Precision.EXACT)
             .allowHardware(true)
+            .crossfade(true)
+            .crossfade(180)
             .apply {
                 if (coverUriStr.contains("video", ignoreCase = true)) {
                     decoderFactory(VideoFrameDecoder.Factory())
