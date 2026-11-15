@@ -288,8 +288,12 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
     }
 
     private fun updateMediaState(list: List<MediaModel>) {
+        if (_rawMediaItems.value == list) return
         _rawMediaItems.value = list
-        _favoriteMediaItems.value = list.filter { it.isFavorite }
+        val favs = list.filter { it.isFavorite }
+        if (_favoriteMediaItems.value != favs) {
+            _favoriteMediaItems.value = favs
+        }
         recomputeAlbums(list)
     }
 
@@ -319,7 +323,7 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             val pinned = repository.getPinnedAlbums()
             val hidden = repository.getHiddenAlbums()
-            _albums.value = list
+            val computed = list
                 .filter { !hidden.contains(it.albumName) }
                 .groupBy { it.albumName }
                 .mapNotNull { (name, media) ->
@@ -336,6 +340,9 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
                     compareByDescending<Album> { it.isPinned }
                         .thenByDescending { it.mediaCount }
                 )
+            if (_albums.value != computed) {
+                _albums.value = computed
+            }
         }
     }
 
