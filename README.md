@@ -11,7 +11,7 @@ Lazzy Gallery is a high-performance, open-source media management application bu
 ![Native](https://img.shields.io/badge/core-Rust%20NDK-000000?style=for-the-badge&logo=rust&logoColor=white)
 ![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)
 ![Storage](https://img.shields.io/badge/storage-Room%20%26%20MediaStore-6DB33F?style=for-the-badge)
-![License](https://img.shields.io/badge/license-AGPL--3.0-blue?style=for-the-badge)
+![License](https://img.shields.io/badge/license-Apache%202.0-red?style=for-the-badge)
 
 </div>
 
@@ -332,7 +332,7 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [C
 
 ## License
 
-Lazzy Gallery is released under the [GNU Affero General Public License v3.0 (AGPLv3)](LICENSE).
+Lazzy Gallery is released under the [Apache License 2.0](LICENSE).
 
 ## Developer
 
