@@ -756,21 +756,17 @@ fun ZoomableImageViewer(
                     }
                 )
             }
-            .then(
-                if (scale > 1.05f) {
-                    Modifier.pointerInput(media.id, scale > 1.05f) {
-                        detectTransformGestures(panZoomLock = true) { _, pan, zoom, _ ->
-                            scale = (scale * zoom).coerceIn(1f, 5f)
-                            if (scale > 1.05f) {
-                                offset += pan
-                            } else {
-                                scale = 1f
-                                offset = Offset.Zero
-                            }
-                        }
+            .pointerInput(media.id) {
+                detectTransformGestures(panZoomLock = false) { _, pan, zoom, _ ->
+                    scale = (scale * zoom).coerceIn(1f, 5f)
+                    if (scale > 1.02f) {
+                        offset += pan
+                    } else {
+                        scale = 1f
+                        offset = Offset.Zero
                     }
-                } else Modifier
-            ),
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
         if (regionBitmap != null && scale > 2.0f) {

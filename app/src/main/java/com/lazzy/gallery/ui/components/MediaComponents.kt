@@ -338,7 +338,6 @@ fun GalleryOverflowMenu(
     onDismissRequest: () -> Unit,
     onSortClick: () -> Unit = {},
     onNewFolderClick: () -> Unit = {},
-    onTrashClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {}
 ) {
     DropdownMenu(
@@ -362,11 +361,6 @@ fun GalleryOverflowMenu(
             text = "Sort by",
             icon = Icons.AutoMirrored.Filled.Sort,
             onClick = { onDismissRequest(); onSortClick() }
-        )
-        OverflowMenuItem(
-            text = "Open the recycle bin",
-            icon = Icons.Default.Delete,
-            onClick = { onDismissRequest(); onTrashClick() }
         )
         OverflowMenuItem(
             text = "Settings",

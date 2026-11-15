@@ -317,6 +317,116 @@ fun SearchScreen(
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        val duplicateStatus by viewModel.duplicateStatus.collectAsState()
+
+                        Card(
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "Duplicate Photo Finder (Rust Native)",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = if (duplicateStatus.isScanning) {
+                                        "Scanning for duplicates: ${duplicateStatus.scannedCount} / ${duplicateStatus.totalCount}"
+                                    } else if (duplicateStatus.duplicateGroups.isNotEmpty()) {
+                                        val totalDuplicates = duplicateStatus.duplicateGroups.sumOf { it.size - 1 }
+                                        "Found $totalDuplicates duplicate photos in ${duplicateStatus.duplicateGroups.size} groups"
+                                    } else {
+                                        "Scan library for duplicate and similar photos using Rust perceptual hashing"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+
+                                if (duplicateStatus.isScanning) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    LinearProgressIndicator(
+                                        progress = {
+                                            if (duplicateStatus.totalCount > 0) duplicateStatus.scannedCount.toFloat() / duplicateStatus.totalCount else 0f
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Button(
+                                            onClick = { viewModel.scanForDuplicates() },
+                                            shape = RoundedCornerShape(16.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Find Duplicates")
+                                        }
+                                        if (duplicateStatus.duplicateGroups.isNotEmpty()) {
+                                            OutlinedButton(
+                                                onClick = { viewModel.clearDuplicates() },
+                                                shape = RoundedCornerShape(16.dp),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text("Clear Results")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (duplicateStatus.duplicateGroups.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Duplicate Groups",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.align(Alignment.Start)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            duplicateStatus.duplicateGroups.forEachIndexed { groupIndex, group ->
+                                Text(
+                                    text = "Group ${groupIndex + 1} (${group.size} items)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.align(Alignment.Start).padding(vertical = 4.dp)
+                                )
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(3),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(130.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    items(group, key = { it.id }) { item ->
+                                        MediaGridThumbnail(
+                                            media = item,
+                                            onClick = {
+                                                viewModel.setCurrentViewedMediaId(item.id)
+                                                onMediaClick(item.id)
+                                            }
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
                     }
                 } else if (filteredItems.isEmpty()) {
                     Box(

@@ -29,6 +29,13 @@ data class OcrStatus(
     val isScanning: Boolean = false
 )
 
+data class DuplicateStatus(
+    val scannedCount: Int = 0,
+    val totalCount: Int = 0,
+    val isScanning: Boolean = false,
+    val duplicateGroups: List<List<MediaModel>> = emptyList()
+)
+
 class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
 
     private val mediaLoadMutex = Mutex()
@@ -194,6 +201,24 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
         }
     }
 
+    private val _duplicateStatus = MutableStateFlow(DuplicateStatus())
+    val duplicateStatus: StateFlow<DuplicateStatus> = _duplicateStatus
+
+    fun scanForDuplicates() {
+        if (_duplicateStatus.value.isScanning) return
+        viewModelScope.launch(Dispatchers.IO) {
+            _duplicateStatus.value = DuplicateStatus(isScanning = true)
+            val groups = repository.findDuplicateMedia { scanned, total ->
+                _duplicateStatus.value = DuplicateStatus(scannedCount = scanned, totalCount = total, isScanning = true)
+            }
+            _duplicateStatus.value = DuplicateStatus(isScanning = false, duplicateGroups = groups)
+        }
+    }
+
+    fun clearDuplicates() {
+        _duplicateStatus.value = DuplicateStatus()
+    }
+
     fun setCurrentViewedMediaId(id: Long?) {
         _currentViewedMediaId.value = id
     }
@@ -242,6 +267,11 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
                 }
             } catch (_: Exception) { }
 
+            // Sync MediaStore with Room immediately on startup in background.
+            try {
+                repository.syncMediaStoreWithRoom()
+            } catch (_: Exception) { }
+
             // Keep the UI in sync with Room.
             launch {
                 repository.observeAllMediaFlow().collect { list ->
@@ -264,6 +294,15 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
                     repository.syncMediaStoreWithRoom()
                 }
             }
+        }
+    }
+
+    fun forceRefreshMediaStore() {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.syncMediaStoreWithRoom()
+            val loaded = repository.fetchAllMedia()
+            updateMediaState(loaded)
+            _isInitialLoadComplete.value = true
         }
     }
 

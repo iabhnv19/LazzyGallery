@@ -1160,4 +1160,53 @@ class MediaRepository(private val context: Context) {
             null
         }
     }
+
+    suspend fun findDuplicateMedia(onProgress: (scanned: Int, total: Int) -> Unit): List<List<MediaModel>> = withContext(Dispatchers.IO) {
+        val allMedia = try { mediaDao.getAllMedia().filter { !it.isVideo } } catch (_: Exception) { emptyList() }
+        val total = allMedia.size
+        if (total < 2) return@withContext emptyList()
+
+        val hashedItems = mutableListOf<Pair<MediaModel, Long>>()
+        var scanned = 0
+        for (item in allMedia) {
+            var hash = 0L
+            try {
+                context.contentResolver.openFileDescriptor(Uri.parse(item.uriString), "r")?.use { pfd ->
+                    hash = RustBridge.nativeComputePHash(pfd.fd)
+                }
+            } catch (_: Throwable) { }
+            if (hash != 0L) {
+                hashedItems.add(item.toMediaModel() to hash)
+            }
+            scanned++
+            onProgress(scanned, total)
+        }
+
+        val visited = mutableSetOf<Long>()
+        val duplicateGroups = mutableListOf<List<MediaModel>>()
+
+        for (i in 0 until hashedItems.size) {
+            val (itemA, hashA) = hashedItems[i]
+            if (visited.contains(itemA.id)) continue
+
+            val group = mutableListOf(itemA)
+            for (j in i + 1 until hashedItems.size) {
+                val (itemB, hashB) = hashedItems[j]
+                if (visited.contains(itemB.id)) continue
+
+                val distance = java.lang.Long.bitCount(hashA xor hashB)
+                if (distance <= 6) {
+                    group.add(itemB)
+                    visited.add(itemB.id)
+                }
+            }
+
+            if (group.size > 1) {
+                visited.add(itemA.id)
+                duplicateGroups.add(group)
+            }
+        }
+
+        duplicateGroups
+    }
 }

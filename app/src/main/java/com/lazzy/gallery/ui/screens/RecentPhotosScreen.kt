@@ -191,7 +191,7 @@ fun RecentPhotosScreen(
                 onRefresh = {
                     coroutineScope.launch {
                         isRefreshing = true
-                        viewModel.loadMedia()
+                        viewModel.forceRefreshMediaStore()
                         delay(500)
                         isRefreshing = false
                     }

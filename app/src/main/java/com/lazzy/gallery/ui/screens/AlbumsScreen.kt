@@ -465,7 +465,6 @@ fun AlbumsScreen(
                         expanded = showOverflowMenu,
                         onDismissRequest = { showOverflowMenu = false },
                         onNewFolderClick = { showNewFolderDialog = true },
-                        onTrashClick = onNavigateToBin,
                         onSettingsClick = onNavigateToSettings
                     )
                 },

@@ -191,3 +191,53 @@ pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_extractExifNative(
         Err(_) => std::ptr::null_mut(),
     }
 }
+
+/// Computes a 64-bit perceptual difference hash (dHash) for duplicate detection.
+#[no_mangle]
+pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_computePHashNative(
+    _env: JNIEnv,
+    _class: JClass,
+    fd: i32,
+) -> i64 {
+    if fd < 0 {
+        return 0;
+    }
+
+    let cloned_fd = unsafe { libc::dup(fd) };
+    if cloned_fd < 0 {
+        return 0;
+    }
+
+    let mut file = unsafe { File::from_raw_fd(cloned_fd) };
+    let mut buffer = Vec::new();
+    if file.read_to_end(&mut buffer).is_err() || buffer.is_empty() {
+        return 0;
+    }
+
+    let reader = match ImageReader::new(Cursor::new(buffer)).with_guessed_format() {
+        Ok(r) => r,
+        Err(_) => return 0,
+    };
+
+    let img = match reader.decode() {
+        Ok(i) => i,
+        Err(_) => return 0,
+    };
+
+    let small = img.grayscale().resize_exact(9, 8, image::imageops::FilterType::Triangle);
+    let luma = small.to_luma8();
+
+    let mut hash: u64 = 0;
+    for y in 0..8 {
+        for x in 0..8 {
+            let left = luma.get_pixel(x, y)[0];
+            let right = luma.get_pixel(x + 1, y)[0];
+            if left > right {
+                hash |= 1;
+            }
+            hash <<= 1;
+        }
+    }
+
+    hash as i64
+}
