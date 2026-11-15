@@ -3,6 +3,7 @@ use jni::objects::JClass;
 use jni::sys::{jbyteArray, jstring};
 use std::fs::File;
 use std::os::unix::io::FromRawFd;
+use std::io::{Read, Cursor};
 use image::GenericImageView;
 use image::io::Reader as ImageReader;
 use imageproc::contrast::contrast;
@@ -26,9 +27,13 @@ pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_nativeDecodeThumbn
         return std::ptr::null_mut();
     }
 
-    let file = unsafe { File::from_raw_fd(cloned_fd) };
+    let mut file = unsafe { File::from_raw_fd(cloned_fd) };
+    let mut buffer = Vec::new();
+    if file.read_to_end(&mut buffer).is_err() || buffer.is_empty() {
+        return std::ptr::null_mut();
+    }
 
-    let reader = match ImageReader::new(std::io::BufReader::new(file)).with_guessed_format() {
+    let reader = match ImageReader::new(Cursor::new(buffer)).with_guessed_format() {
         Ok(r) => r,
         Err(_) => return std::ptr::null_mut(),
     };
@@ -49,7 +54,7 @@ pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_nativeDecodeThumbn
     };
 
     let mut jpg_bytes = Vec::new();
-    let mut cursor = std::io::Cursor::new(&mut jpg_bytes);
+    let mut cursor = Cursor::new(&mut jpg_bytes);
     if resized.write_to(&mut cursor, image::ImageFormat::Jpeg).is_err() {
         return std::ptr::null_mut();
     }
@@ -76,8 +81,13 @@ pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_nativePreprocessOc
         return std::ptr::null_mut();
     }
 
-    let file = unsafe { File::from_raw_fd(cloned_fd) };
-    let reader = match ImageReader::new(std::io::BufReader::new(file)).with_guessed_format() {
+    let mut file = unsafe { File::from_raw_fd(cloned_fd) };
+    let mut buffer = Vec::new();
+    if file.read_to_end(&mut buffer).is_err() || buffer.is_empty() {
+        return std::ptr::null_mut();
+    }
+
+    let reader = match ImageReader::new(Cursor::new(buffer)).with_guessed_format() {
         Ok(r) => r,
         Err(_) => return std::ptr::null_mut(),
     };
@@ -87,12 +97,11 @@ pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_nativePreprocessOc
         Err(_) => return std::ptr::null_mut(),
     };
 
-    // Convert to grayscale and increase contrast for crisp text recognition
     let gray = img.grayscale();
     let enhanced = contrast(&gray.to_luma8(), 30);
 
     let mut jpg_bytes = Vec::new();
-    let mut cursor = std::io::Cursor::new(&mut jpg_bytes);
+    let mut cursor = Cursor::new(&mut jpg_bytes);
     if enhanced.write_to(&mut cursor, image::ImageFormat::Jpeg).is_err() {
         return std::ptr::null_mut();
     }
@@ -131,7 +140,6 @@ pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_nativeExtractExif(
     let mut file = unsafe { File::from_raw_fd(cloned_fd) };
 
     let mut buffer = Vec::new();
-    use std::io::Read;
     if file.read_to_end(&mut buffer).is_err() {
         return std::ptr::null_mut();
     }
@@ -154,8 +162,7 @@ pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_nativeExtractExif(
         }
     }
 
-    // Try reading dimensions via image reader as well
-    let reader = ImageReader::new(std::io::Cursor::new(&buffer)).with_guessed_format();
+    let reader = ImageReader::new(Cursor::new(&buffer)).with_guessed_format();
     let (w, h) = if let Ok(r) = reader {
         if let Ok(dims) = r.into_dimensions() {
             (Some(dims.0), Some(dims.1))
