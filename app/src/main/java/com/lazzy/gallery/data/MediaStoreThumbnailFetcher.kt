@@ -65,14 +65,11 @@ class MediaStoreThumbnailFetcher(
         if (thumbFile.exists() && thumbFile.length() > 0) {
             try {
                 val opts = BitmapFactory.Options().apply {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        inPreferredConfig = Bitmap.Config.HARDWARE
-                    }
+                    inPreferredConfig = Bitmap.Config.RGB_565
                     inMutable = false
                 }
                 var bitmap = BitmapFactory.decodeFile(thumbFile.absolutePath, opts)
                 if (bitmap == null) {
-                    // Some devices cannot decode the cache as a hardware bitmap.
                     bitmap = BitmapFactory.decodeFile(thumbFile.absolutePath)
                 }
 
@@ -100,9 +97,8 @@ class MediaStoreThumbnailFetcher(
                 }
                 if (jpegBytes != null && jpegBytes.isNotEmpty()) {
                     val opts = BitmapFactory.Options().apply {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            inPreferredConfig = Bitmap.Config.HARDWARE
-                        }
+                        inPreferredConfig = Bitmap.Config.RGB_565
+                        inMutable = false
                     }
                     var bitmap = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size, opts)
                     if (bitmap == null) {

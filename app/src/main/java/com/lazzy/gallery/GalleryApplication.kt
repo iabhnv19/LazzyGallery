@@ -32,9 +32,9 @@ class GalleryApplication : Application(), ImageLoaderFactory {
     }
 
     override fun newImageLoader(): ImageLoader {
-        // Linear 2-thread sequential queue with low thread priority so thumbnail decoding
-        // runs linearly 1-by-1 in the background without causing scroll lag or thread contention.
-        val decoderDispatcher = Executors.newFixedThreadPool(2) { runnable ->
+        // Optimized 3-thread linear queue with LOWEST priority to decode thumbnails
+        // ultra-fast without ever competing for UI thread resources.
+        val decoderDispatcher = Executors.newFixedThreadPool(3) { runnable ->
             Thread {
                 Process.setThreadPriority(Process.THREAD_PRIORITY_LOWEST)
                 runnable.run()
@@ -44,7 +44,7 @@ class GalleryApplication : Application(), ImageLoaderFactory {
             }
         }.asCoroutineDispatcher()
 
-        val fetcherDispatcher = Executors.newFixedThreadPool(2) { runnable ->
+        val fetcherDispatcher = Executors.newFixedThreadPool(3) { runnable ->
             Thread {
                 Process.setThreadPriority(Process.THREAD_PRIORITY_LOWEST)
                 runnable.run()
@@ -59,7 +59,7 @@ class GalleryApplication : Application(), ImageLoaderFactory {
             .decoderDispatcher(decoderDispatcher)
             .memoryCache {
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.45)
+                    .maxSizePercent(0.40)
                     .build()
             }
             .diskCache {
