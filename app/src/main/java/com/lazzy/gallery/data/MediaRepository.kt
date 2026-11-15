@@ -453,8 +453,8 @@ class MediaRepository(private val context: Context) {
             val idListStr = idChunk.joinToString(",")
             val selection = "${MediaStore.MediaColumns._ID} IN ($idListStr)"
             val list = mutableListOf<MediaModel>()
-            queryMediaStoreInternal(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, imageProjection, true, false, favoriteIds, list, selection)
-            queryMediaStoreInternal(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, videoProjection, true, true, favoriteIds, list, selection)
+            queryMediaStoreInternal(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, imageProjection, false, false, favoriteIds, list, selection)
+            queryMediaStoreInternal(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, videoProjection, false, true, favoriteIds, list, selection)
             list.forEach { media ->
                 val trashed = media.isTrashed || localTrashedIds.contains(media.id)
                 result.add(
