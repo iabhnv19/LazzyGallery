@@ -11,7 +11,7 @@ use imageproc::contrast::contrast;
 /// Decodes an image from a raw file descriptor (fd), resizes it to target dimensions,
 /// and returns compressed JPEG thumbnail bytes.
 #[no_mangle]
-pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_nativeDecodeThumbnail(
+pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_decodeThumbnailNative(
     mut env: JNIEnv,
     _class: JClass,
     fd: i32,
@@ -67,7 +67,7 @@ pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_nativeDecodeThumbn
 
 /// Preprocesses an image for OCR: converts to grayscale and enhances contrast.
 #[no_mangle]
-pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_nativePreprocessOcr(
+pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_preprocessOcrNative(
     mut env: JNIEnv,
     _class: JClass,
     fd: i32,
@@ -123,7 +123,7 @@ struct ExifInfo {
 
 /// Extracts EXIF metadata and returns a JSON string.
 #[no_mangle]
-pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_nativeExtractExif(
+pub extern "system" fn Java_com_lazzy_gallery_data_RustBridge_extractExifNative(
     mut env: JNIEnv,
     _class: JClass,
     fd: i32,

@@ -116,7 +116,7 @@ class MediaStoreThumbnailFetcher(
                                     out.write(jpegBytes)
                                 }
                                 tempFile.renameTo(thumbFile)
-                            } catch (_: Exception) { }
+                            } catch (_: Throwable) { }
                         }
 
                         val drawable = BitmapDrawable(context.resources, bitmap)
@@ -128,7 +128,7 @@ class MediaStoreThumbnailFetcher(
                     }
                 }
             }
-        } catch (_: Exception) { }
+        } catch (_: Throwable) { }
 
         // Ask MediaStore for the thumbnail when the cache misses.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

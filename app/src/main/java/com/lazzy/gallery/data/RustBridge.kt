@@ -1,27 +1,47 @@
 package com.lazzy.gallery.data
 
 object RustBridge {
+    private var isLoaded: Boolean = false
+
     init {
         try {
             System.loadLibrary("gallery_rust_core")
-        } catch (e: UnsatisfiedLinkError) {
-            e.printStackTrace()
+            isLoaded = true
+        } catch (t: Throwable) {
+            isLoaded = false
         }
     }
 
-    /**
-     * Decodes an image thumbnail natively in Rust using a file descriptor (fd).
-     * Returns compressed JPEG bytes, or null if native decoding fails.
-     */
-    external fun nativeDecodeThumbnail(fd: Int, targetWidth: Int, targetHeight: Int): ByteArray?
+    fun isAvailable(): Boolean = isLoaded
 
-    /**
-     * Preprocesses an image for OCR natively in Rust.
-     */
-    external fun nativePreprocessOcr(fd: Int): ByteArray?
+    fun nativeDecodeThumbnail(fd: Int, targetWidth: Int, targetHeight: Int): ByteArray? {
+        if (!isLoaded) return null
+        return try {
+            decodeThumbnailNative(fd, targetWidth, targetHeight)
+        } catch (t: Throwable) {
+            null
+        }
+    }
 
-    /**
-     * Extracts EXIF metadata natively in Rust and returns a JSON string.
-     */
-    external fun nativeExtractExif(fd: Int): String?
+    fun nativePreprocessOcr(fd: Int): ByteArray? {
+        if (!isLoaded) return null
+        return try {
+            preprocessOcrNative(fd)
+        } catch (t: Throwable) {
+            null
+        }
+    }
+
+    fun nativeExtractExif(fd: Int): String? {
+        if (!isLoaded) return null
+        return try {
+            extractExifNative(fd)
+        } catch (t: Throwable) {
+            null
+        }
+    }
+
+    private external fun decodeThumbnailNative(fd: Int, targetWidth: Int, targetHeight: Int): ByteArray?
+    private external fun preprocessOcrNative(fd: Int): ByteArray?
+    private external fun extractExifNative(fd: Int): String?
 }
