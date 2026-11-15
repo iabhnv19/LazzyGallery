@@ -2,224 +2,361 @@
 
 # Lazzy Gallery
 
-[![Build Status](https://img.shields.io/badge/build-passing-success)](https://github.com/iabhnv19/lazzy-gallery)
-[![Developer](https://img.shields.io/badge/developer-iabhnv19-blue.svg)](https://github.com/iabhnv19)
-[![Kotlin Version](https://img.shields.io/badge/kotlin-2.2.10-blue.svg)](https://kotlinlang.org)
-[![Compose Version](https://img.shields.io/badge/compose-2026.02-brightgreen.svg)](https://developer.android.com/jetpack/compose)
-[![Min SDK](https://img.shields.io/badge/min--sdk-24%20%2F%20Android%207.0-orange)](https://developer.android.com)
-[![License](https://img.shields.io/badge/license-Apache%202.0-red.svg)](LICENSE)
+### Fast, smooth, privacy-first, and native-powered photo & video gallery for Android.
 
-A high-performance, privacy-focused, open-source Android media gallery application engineered with Jetpack Compose, Material 3, and an offline-first architecture.
+Lazzy Gallery is a high-performance, open-source media management application built with Jetpack Compose, Material 3, and a native Rust core for zero-lag performance and butter-smooth scrolling.
 
-Developed by **[iabhnv19](https://github.com/iabhnv19)**.
+![Platform](https://img.shields.io/badge/platform-Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
+![Language](https://img.shields.io/badge/language-Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
+![Native](https://img.shields.io/badge/core-Rust%20NDK-000000?style=for-the-badge&logo=rust&logoColor=white)
+![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)
+![Storage](https://img.shields.io/badge/storage-Room%20%26%20MediaStore-6DB33F?style=for-the-badge)
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue?style=for-the-badge)
 
 </div>
 
 ---
 
-## Table of Contents
+## Why this exists
 
-- [Overview](#overview)
-- [Screenshots](#screenshots)
-- [Core Features](#core-features)
-- [Privacy & Local-First Architecture](#privacy--local-first-architecture)
-- [Architecture & Design Pattern](#architecture--design-pattern)
-- [Deep-Dive Technical Implementation](#deep-dive-technical-implementation)
-  - [Scoped Storage & MediaStore Integration](#scoped-storage--mediastore-integration)
-  - [Multi-Tier Caching Pipeline](#multi-tier-caching-pipeline)
-  - [Background Synchronization](#background-synchronization)
-  - [Ambient Background & Visual Effects](#ambient-background--visual-effects)
-- [Tech Stack & Dependencies](#tech-stack--dependencies)
-- [Project Directory Structure](#project-directory-structure)
-- [Installation Guide](#installation-guide)
-- [Building & Running from Source](#building--running-from-source)
-- [Contributing](#contributing)
-- [License](#license)
+Managing large photo and video collections (10,000+ items) on mobile devices often suffers from scroll stutter, memory spikes, and privacy intrusions from cloud sync apps. Rebuilding a fast, smooth gallery requires bypass of JVM garbage collection bottlenecks during heavy thumbnail decoding and indexing.
 
----
+Lazzy Gallery solves these performance bottlenecks by offloading heavy image decoding, downscaling, EXIF extraction, and OCR image preprocessing to a native **Rust core** (`rust_core`). The app runs at 120 FPS with zero tracking, zero advertising SDKs, and complete local privacy.
 
-## Overview
-
-Lazzy Gallery is an optimized, privacy-first media management application built natively for Android. Designed to handle large media libraries efficiently, it combines a reactive declarative UI (`Jetpack Compose`), offline-first local database caching (`Room`), hardware-accelerated video playback (`Media3 ExoPlayer`), and background synchronization (`WorkManager`). 
-
-Lazzy Gallery operates entirely offline with zero telemetry, zero analytics tracking, and strict adherence to modern Android storage guidelines.
-
----
-
-## Screenshots
-
-<div align="center">
-  <table border="0">
-    <tr>
-      <td align="center"><b>Main Library Grid</b></td>
-      <td align="center"><b>Media Viewer & EXIF</b></td>
-      <td align="center"><b>Advanced Options Menu</b></td>
-    </tr>
-    <tr>
-      <td><img src="docs/images/main_library.png" width="240" alt="Main Library Grid"/></td>
-      <td><img src="docs/images/photo_detail.png" width="240" alt="Photo Detail"/></td>
-      <td><img src="docs/images/overflow_menu.png" width="240" alt="Overflow Menu"/></td>
-    </tr>
-  </table>
-</div>
-
----
-
-## Core Features
-
-- **Asynchronous Media Indexing**: Non-blocking queries against the Android MediaStore content provider with projection optimization.
-- **Hierarchical Album Organization**: Automatic bucket categorization and folder grouping with real-time item counts.
-- **Hardware-Accelerated Video Playback**: Integrated AndroidX Media3 ExoPlayer supporting custom controls, scrubbing, and seamless buffering.
-- **Persistent Favorites & Collections**: Local bookmarking state management utilizing SharedPreferences and Room entities.
-- **Recycle Bin & Trash Workflow**: Soft deletion mechanism supporting file restoration and secure purge operations.
-- **Real-Time Search & Filtering**: Instant query filtering across file names, dates, and media types (Images vs. Videos).
-- **Comprehensive EXIF Inspector & Actions**: Metadata extraction parsing camera make/model, ISO, exposure time, aperture, focal length, resolution, and GPS coordinates alongside built-in tools (Rename, Hide, Copy, Open With, Set As, Print, Show on Map, and Slideshow).
-- **Ambient Background Visuals**: Dynamic ambient lighting and blur effects rendering immersive visual backdrops in media viewing screens.
-- **Material 3 Design System**: Full support for dynamic color schemes, adaptive layouts, and dark/light themes.
-
----
-
-## Privacy & Local-First Architecture
-
-Lazzy Gallery is built with absolute user privacy as a core tenet:
-- **100% Offline Operation**: The application requires zero network permissions for core functionality. It does not communicate with external servers, cloud databases, or API endpoints.
-- **Zero Telemetry & Tracking**: No crash reporting tools, analytics SDKs, or advertising libraries are embedded. Your personal photos and metadata never leave your device.
-- **Direct Storage Access**: Interacts strictly with local Android Scoped Storage and MediaStore APIs.
-
----
-
-## Architecture & Design Pattern
-
-Lazzy Gallery strictly adheres to the Model-View-ViewModel (MVVM) architecture pattern combined with Unidirectional Data Flow (UDF):
-
-1. **Presentation Layer (`ui/`)**: Built entirely with Jetpack Compose. Composables remain stateless, observing state streams exposed via Kotlin `StateFlow`.
-2. **ViewModel Layer (`ui/viewmodel/`)**: `MediaViewModel` encapsulates all business logic, sorting algorithms, multi-selection states, and filter transformations, executing operations asynchronously within `viewModelScope`.
-3. **Data Layer (`data/`)**: `MediaRepository` acts as the single source of truth, coordinating between the system `ContentResolver`, background workers, and the local `Room` database cache.
-
----
-
-## Deep-Dive Technical Implementation
-
-### Scoped Storage & MediaStore Integration
-Lazzy Gallery complies with Android Scoped Storage requirements (API 29+ while maintaining backward compatibility down to API 24). Queries utilize targeted projections (`MediaStore.Images.Media` and `MediaStore.Video.Media`) to minimize memory allocation during cursor traversal. File mutations and deletions leverage `MediaStore.createDeleteRequest` and `MediaStore.createWriteRequest` intents for seamless user-consented batch operations.
-
-### Multi-Tier Caching Pipeline
-To eliminate cold-start lag when launching the application or switching fragments, Lazzy Gallery implements a three-tier caching strategy:
-1. **Global In-Memory Cache (`GlobalMediaCache`)**: Retains active list references in RAM during navigation transitions.
-2. **Instant JSON Disk Snapshot**: Serializes core media metadata to `context.cacheDir` on startup for sub-millisecond retrieval.
-3. **Room Database Persistence**: Stores complete media entities locally. If system queries are delayed, cached database records render instantly while background synchronization reconciles delta changes.
-
-### Background Synchronization
-Periodic and event-driven data synchronization is managed through `WorkManager` (`MediaSyncWorker`). The application registers content observers on MediaStore directories to detect external file additions or deletions, triggering incremental Room database updates without blocking the main thread.
-
-### Ambient Background & Visual Effects
-Media viewing screens utilize custom Compose rendering pipelines featuring dynamic ambient blur filters and floating navigation elements (`FloatingNavigationBar`) with blur mask rendering for an immersive user experience.
-
----
-
-## Tech Stack & Dependencies
-
-| Category | Technology | Version | Purpose |
-| :--- | :--- | :--- | :--- |
-| **UI Toolkit** | Jetpack Compose | BOM 2026.02 | Declarative UI rendering & state observation |
-| **Design System** | Material 3 | Latest | Material Design specifications & dynamic theming |
-| **Navigation** | Navigation Compose | 2.10.1 | Type-safe route navigation & animations |
-| **Persistence** | Room | 2.7.1 | Relational database caching & DAO queries |
-| **Image Loading** | Coil | 2.7.0 | High-performance bitmap, GIF, & video frame decoding |
-| **Video Playback** | Media3 ExoPlayer | 1.5.1 | Hardware-accelerated video rendering |
-| **Background Tasks** | WorkManager | 2.9.1 | Reliable background media synchronization |
-| **Metadata** | Exifinterface | 1.3.7 | EXIF tag extraction |
-
----
-
-## Project Directory Structure
+The project is designed around a fast, predictable workflow:
 
 ```text
-com.lazzy.gallery/
-│
-├── data/
-│   ├── local/
-│   │   ├── GalleryDatabase.kt    # Room database abstract definition
-│   │   ├── MediaDao.kt           # SQL queries and data access methods
-│   │   └── MediaEntity.kt        # Room entity model for cached media
-│   ├── worker/
-│   │   └── MediaSyncWorker.kt    # WorkManager background sync worker
-│   ├── MediaModel.kt             # Domain data models (MediaModel, Album, ExifMetadata)
-│   ├── MediaRepository.kt        # MediaStore and Room orchestration layer
-│   └── MediaStoreThumbnailFetcher.kt # Custom Coil thumbnail fetcher
-│
-├── ui/
-│   ├── components/
-│   │   ├── FloatingNavigationBar.kt # Custom floating bottom navigation
-│   │   ├── MediaComponents.kt       # Grid layouts, cards, and selection bars
-│   │   └── VideoPlayerView.kt       # ExoPlayer Compose wrapper
-│   ├── navigation/
-│   │   └── GalleryNavigation.kt     # Navigation graph and routing
-│   ├── screens/
-│   │   ├── AlbumDetailScreen.kt     # Album contents view
-│   │   ├── AlbumsScreen.kt          # Album bucket overview
-│   │   ├── FavoritesScreen.kt       # Bookmarked media collection
-│   │   ├── PhotoDetailScreen.kt     # Immersive viewer and EXIF sheet
-│   │   ├── RecentPhotosScreen.kt    # Main timeline grid
-│   │   ├── RecycleBinScreen.kt      # Deleted items recovery view
-│   │   └── SearchScreen.kt          # Real-time search interface
-│   ├── theme/
-│   │   ├── Color.kt                 # Material 3 color definitions
-│   │   ├── Theme.kt                 # Material theme configuration
-│   │   └── Type.kt                  # Typography styles
-│   └── viewmodel/
-│       └── MediaViewModel.kt        # Central state holder and business logic
-│
-└── MainActivity.kt                 # Application entry point and permission flows
+Open app -> Instant cache render -> Smooth scroll -> Native decode -> Local edit or share
 ```
 
----
+There is no account system, sign-in flow, advertising SDK, cloud upload requirement, analytics service, or tracking endpoint.
 
-## Installation Guide
+## What it provides
 
-To install Lazzy Gallery directly on your Android device:
+| Capability | Description |
+|------------|-------------|
+| Native Rust Core | Offloads thumbnail decoding, downscaling, and EXIF extraction to compiled Rust NDK |
+| Instant Cold Boot | Application-level cache pre-warming and Room B-tree database indexing |
+| Butter-Smooth Grid | 16-bit `RGB_565` decoding with a 3-thread linear queue and 180ms crossfade transitions |
+| OCR Text Search | Search photos by text contained within them using ML Kit & Rust contrast enhancement |
+| Customizable Navigation | Customize the bottom-right navigation action to open Favorites, Camera, or File Manager |
+| Expressive Theming | Dynamic Light & Dark themes with custom accent color blending across top headers |
+| Local Privacy & Trash | Local bin recovery, hidden folder vault, and zero internet permission |
 
-1. Navigate to the **Releases** tab in this GitHub repository.
-2. Download the latest `.apk` file (`app-release.apk`).
-3. On your Android device, open your device settings and enable **"Install from unknown sources"** for your browser or file manager.
-4. Tap the downloaded `.apk` file and complete the installation.
-5. Open Lazzy Gallery, grant storage permissions, and enjoy!
+## Features
 
----
+### Native Rust Engine
 
-## Building & Running from Source
+- Zero-overhead native thumbnail decoding via raw file descriptors (`ParcelFileDescriptor`)
+- Fast 16-bit `RGB_565` image downscaling (50% less RAM usage, 2x faster JPEG decoding)
+- Native EXIF metadata extraction (`rexif`) with JSON serialization
+- High-contrast grayscale image preprocessing for ML Kit OCR text recognition
 
-### System Requirements
+### Library & Recent Timeline
 
-- **Android Studio**: Ladybug, Koala, or newer.
-- **Java Development Kit (JDK)**: Version 11 or higher.
-- **Android SDK**: Compile SDK 37, Min SDK 24, Target SDK 35.
+- Instant cold boot with pre-warmed memory cache
+- Chronological timeline grouping by date added
+- Customizable grid layout (2 to 5 columns for photos, 1 to 3 columns for albums)
+- Range drag selection for batch sharing, trashing, or favoriting
 
-### Build Instructions
+### Albums & Folder Management
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/iabhnv19/lazzy-gallery.git
-   ```
-2. Open Android Studio and select **Open an Existing Project** pointing to the repository root.
-3. Allow Gradle to synchronize dependencies.
-4. Connect an Android device (API 24+) or launch an emulator.
-5. Build and execute the `:app` run configuration (`Shift + F10`).
+- Group photos and videos by storage folder/bucket
+- Pin important albums to the top of the grid
+- Hide sensitive folders from the main timeline view
+- Create new album folders directly from the app
 
----
+### Customizable Navigation Bar
+
+- Floating, blurred bottom navigation bar
+- Quick access to Library, Albums, Trash, and Search
+- Customizable 3rd action button: toggle between **Favorites**, **Camera**, or **File Manager** in Settings
+
+### Full-Screen Viewer & Video Player
+
+- Smooth pinch-to-zoom and pan gestures
+- Hardware-accelerated video playback powered by Media3 ExoPlayer
+- Ambient backdrop blur effect behind full-screen media
+- EXIF details inspector panel (resolution, aperture, ISO, exposure, focal length, camera model)
+
+### Privacy & Recycle Bin
+
+- Local Trash bin with soft-delete recovery and permanent deletion options
+- Hidden media vault to shield sensitive photos from the timeline
+- Operates 100% offline without the `INTERNET` permission
+
+## Quick start
+
+### Requirements
+
+- Android Studio (Ladybug or newer recommended)
+- Android SDK 35 (minSdk 24, targetSdk 35, compileSdk 37)
+- JDK 17 or higher
+- Rust toolchain (`rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android`)
+- `cargo-ndk` (`cargo install cargo-ndk`)
+- Android NDK installed via Android Studio SDK Manager
+
+### Clone the repository
+
+```bash
+git clone https://github.com/iabhnv19/LazzyGallery.git
+cd LazzyGallery
+```
+
+### Open in Android Studio
+
+1. Open Android Studio.
+2. Select **Open** and choose the `LazzyGallery` repository directory.
+3. Wait for Gradle sync to finish.
+4. Connect a physical Android device or start an emulator.
+5. Select the `app` run configuration.
+6. Press **Run**.
+
+The app launches instantly without any registration or account requirements.
+
+## Build and test
+
+### Windows
+
+Build a debug APK (automatically compiles `rust_core` via `cargo-ndk`):
+
+```bat
+gradlew.bat assembleDebug
+```
+
+Run unit tests:
+
+```bat
+gradlew.bat testDebugUnitTest
+```
+
+### macOS and Linux
+
+```bash
+./gradlew assembleDebug
+./gradlew testDebugUnitTest
+```
+
+The debug APK is generated at:
+
+```text
+app/build/outputs/apk/debug/app-debug.apk
+```
+
+### Build variants
+
+| Variant | Purpose |
+|---------|---------|
+| `debug` | Local development with debug logging and native debug symbols |
+| `release` | Minified release build using ProGuard and optimized Rust release binary |
+
+Build a release APK with:
+
+```bash
+./gradlew assembleRelease
+```
+
+For Windows, use `gradlew.bat assembleRelease`.
+
+## How to use
+
+### Customize Bottom-Right Nav Button
+
+1. Open **Settings** from the overflow menu in Albums or Library.
+2. Tap **Bottom Right Nav Button**.
+3. Cycle between **Favorites (Default)**, **Camera**, or **File Manager**.
+4. The floating bottom navigation bar immediately updates its icon and action.
+
+### Search Text in Photos (OCR)
+
+1. Open **Settings** -> tap **Start OCR Scanning**.
+2. Wait for the native Rust preprocessor and ML Kit to index text in your photos.
+3. Navigate to **Search** screen and type any text (e.g., "receipt", "contract", "notes") to find matching photos instantly.
+
+### Hide or Pin Albums
+
+1. Open the **Albums** tab.
+2. Long-press any album card.
+3. Select **Pin folder to top** or **Hide folder**.
+
+## Media Data Model
+
+The app represents media items with this data structure:
+
+```text
+MediaModel
+├── id
+├── uri
+├── displayName
+├── dateAdded
+├── dateModified
+├── albumName
+├── isVideo
+├── duration
+├── size
+├── width & height
+├── mimeType
+├── isFavorite
+├── isTrashed
+└── ocrText?
+```
+
+Room Database (`media_index` table) maintains indexed columns on `dateAdded`, `isTrashed`, `isHidden`, and `albumName` for B-tree query speeds.
+
+## Privacy and permissions
+
+Lazzy Gallery is an offline-first application.
+
+### Permissions Used
+
+- `READ_MEDIA_IMAGES` & `READ_MEDIA_VIDEO` (Android 13+) / `READ_EXTERNAL_STORAGE` (Android 12 & lower)
+- `READ_MEDIA_VISUAL_USER_SELECTED` (Android 14+)
+
+### Security & Privacy Features
+
+- Zero network calls (No `INTERNET` permission in `AndroidManifest.xml`).
+- No advertising SDKs.
+- No analytics or crash reporting servers.
+- All media processing, OCR indexing, thumbnail generation, and EXIF extraction happen locally on-device.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A[MainActivity] --> B[GalleryNavigation]
+    B --> C[RecentPhotosScreen]
+    B --> D[AlbumsScreen]
+    B --> E[FavoritesScreen]
+    B --> F[SearchScreen]
+    B --> G[SettingsScreen]
+    C --> H[MediaViewModel]
+    D --> H
+    E --> H
+    F --> H
+    G --> H
+    H --> I[MediaRepository]
+    I --> J[Room MediaDao]
+    I --> K[MediaStore ContentResolver]
+    I --> L[RustBridge JNI]
+    L --> M[rust_core Native Lib]
+```
+
+### Component Responsibilities
+
+| Component | Responsibility |
+|-----------|----------------|
+| `MainActivity` | Configures activity window, status bar icon theme, and Compose root |
+| `GalleryNavigation` | Manages screen transitions and shared element animations |
+| `MediaViewModel` | Exposes media Flow states, sorting, selection, and theme preferences |
+| `MediaRepository` | Manages local Room database caching, MediaStore content observers, and Rust JNI |
+| `RustBridge` | JNI wrapper executing native Rust thumbnail decoding, OCR contrast preprocessing, and EXIF parsing |
+| `rust_core` | Native Rust crate (`cdylib`) compiling high-performance C-ABI functions for Android |
+| `MediaStoreThumbnailFetcher` | Custom Coil fetcher executing 16-bit `RGB_565` native thumbnail decoding |
+| `GalleryApplication` | Pre-warms media cache on launch and manages 3-thread linear Coil image loader |
+
+## Project structure
+
+```text
+LazzyGallery/
+├── app/
+│   ├── build.gradle.kts
+│   └── src/
+│       ├── main/
+│       │   ├── AndroidManifest.xml
+│       │   ├── java/com/lazzy/gallery/
+│       │   │   ├── data/                        # Repository, Coil fetcher, and Rust JNI bridge
+│       │   │   │   ├── local/                   # Room database, entity, and DAO
+│       │   │   │   └── worker/                  # Background sync workers
+│       │   │   ├── ui/
+│       │   │   │   ├── components/              # Floating nav bar, media grid items, video player
+│       │   │   │   ├── navigation/              # App navigation routes
+│       │   │   │   ├── screens/                 # Compose screens (Recent, Albums, Detail, Search, etc.)
+│       │   │   │   └── theme/                   # Material 3 colors, typography, and palette generator
+│       │   │   ├── GalleryApplication.kt        # Pre-warming & Coil configuration
+│       │   │   └── MainActivity.kt              # Main Activity entry point
+│       │   └── res/                             # Icons, themes, strings, and XML resources
+├── rust_core/                                   # Native Rust crate
+│   ├── Cargo.toml
+│   └── src/
+│       └── lib.rs                               # JNI functions (image decoding, OCR prep, EXIF)
+├── .github/
+│   ├── ISSUE_TEMPLATE/                          # Bug report & feature request templates
+│   └── PULL_REQUEST_TEMPLATE.md                 # PR template
+├── CODE_OF_CONDUCT.md
+├── CONTRIBUTING.md
+├── LICENSE
+├── README.md
+└── SECURITY.md
+```
+
+## Dependencies
+
+| Library | Purpose |
+|---------|---------|
+| Jetpack Compose | Declarative UI toolkit |
+| Material 3 | Modern Material Design components |
+| Coil | Reactive image loading pipeline |
+| Media3 ExoPlayer | Hardware-accelerated video playback |
+| Room | Local SQLite database ORM |
+| ML Kit Text Recognition | On-device OCR text extraction |
+| Rust `image` & `rexif` & `imageproc` | Native image downscaling, EXIF extraction, & image processing |
+
+## Troubleshooting
+
+<details>
+<summary><b>Cargo-NDK build fails or command not found</b></summary>
+
+Install `cargo-ndk` via Cargo: `cargo install cargo-ndk`. Ensure Android NDK is installed via Android Studio SDK Manager and `ANDROID_NDK_HOME` or `ndk.dir` is set.
+</details>
+
+<details>
+<summary><b>Thumbnails take a moment to load on first launch</b></summary>
+
+Thumbnails are decoded natively on-demand and saved to the local disk cache (`cacheDir/thumbnails`). Once cached, subsequent scrolls retrieve 16-bit `RGB_565` bitmaps instantly from RAM.
+</details>
+
+<details>
+<summary><b>Status bar icons are hard to see in Light Mode</b></summary>
+
+The app automatically controls system bar contrast (`isAppearanceLightStatusBars`). If custom ROMs override system bar styling, toggle Dark Theme in Settings.
+</details>
+
+## Known limitations
+
+- Cloud backup integration (e.g. Google Drive / Nextcloud) is intentionally excluded to preserve 100% local privacy.
+- RAW camera image files (.CR2, .NEF) are downscaled using Android system decoders if the native Rust decoder misses.
 
 ## Contributing
 
-Contributions to Lazzy Gallery are welcome. Please adhere to the following workflow:
-
-1. Fork the repository.
-2. Create a feature branch (`git checkout -b feature/Optimization`).
-3. Commit your changes (`git commit -m 'Improve query performance in MediaDao'`).
-4. Push to the branch (`git push origin feature/Optimization`).
-5. Open a Pull Request for review.
-
----
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before opening issues or pull requests.
 
 ## License
 
-Lazzy Gallery is open-source software licensed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for details.
+Lazzy Gallery is released under the [GNU Affero General Public License v3.0 (AGPLv3)](LICENSE).
+
+## Developer
+
+Developed By
+<div align="center">
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/iabhnv19">
+        <img src="https://github.com/iabhnv19.png" width="80" height="80" alt="Abhinav's GitHub profile picture" />
+        <br />
+        <strong>Abhinav</strong>
+        <br />
+        @iabhnv19
+      </a>
+    </td>
+  </tr>
+</table>
+</div>
+
+<div align="center">
+
+**Built with Kotlin, Rust, and Jetpack Compose for a blazing-fast, privacy-first gallery experience.**
+
+</div>
+"
