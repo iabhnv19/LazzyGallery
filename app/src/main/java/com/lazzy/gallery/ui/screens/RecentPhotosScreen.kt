@@ -251,19 +251,17 @@ fun RecentPhotosScreen(
                         }
                     }
 
-                    LazyVerticalGrid(
-                        state = gridState,
-                        columns = GridCells.Fixed(libraryColumns),
-                        modifier = Modifier
+                    val gridModifier = if (isSelectionMode) {
+                        Modifier
                             .fillMaxSize()
                             .padding(horizontal = 8.dp)
                             .pointerInput(isSelectionMode, mediaItems) {
                                 val viewConfig = viewConfiguration
-                                val holdTimeout = if (isSelectionMode) 160L else viewConfig.longPressTimeoutMillis
+                                val holdTimeout = 160L
                                 val touchSlop = viewConfig.touchSlop
 
                                 awaitEachGesture {
-                                    val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+                                    val down = awaitFirstDown(pass = PointerEventPass.Main, requireUnconsumed = false)
                                     val startPos = down.position
                                     val startIdx = findItemIndexAtPosition(gridState, startPos) ?: return@awaitEachGesture
                                     val pointerId = down.id
@@ -272,7 +270,7 @@ fun RecentPhotosScreen(
                                     val holdSuccess = try {
                                         withTimeout(holdTimeout) {
                                             while (true) {
-                                                val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                                val event = awaitPointerEvent(pass = PointerEventPass.Main)
                                                 val change = event.changes.firstOrNull { it.id == pointerId }
                                                 if (change == null || change.isConsumed || !change.pressed) {
                                                     return@withTimeout false
@@ -355,7 +353,17 @@ fun RecentPhotosScreen(
                                         currentDragPosition = null
                                     }
                                 }
-                            },
+                            }
+                    } else {
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp)
+                    }
+
+                    LazyVerticalGrid(
+                        state = gridState,
+                        columns = GridCells.Fixed(libraryColumns),
+                        modifier = gridModifier,
                         contentPadding = PaddingValues(
                             top = 16.dp,
                             bottom = 140.dp

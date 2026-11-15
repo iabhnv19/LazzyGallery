@@ -256,8 +256,9 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
                 }
             }
 
-            // Listen for changes made by other apps.
+            // Listen for changes made by other apps (after initial cold boot).
             launch {
+                kotlinx.coroutines.delay(3500)
                 repository.observeMediaStoreChanges().collect {
                     // Refresh Room so its flow can update the UI.
                     repository.syncMediaStoreWithRoom()

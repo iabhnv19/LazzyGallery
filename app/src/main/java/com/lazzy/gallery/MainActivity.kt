@@ -75,23 +75,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val d = display
-            val currentMode = d?.mode
-            val highRefreshMode = d?.supportedModes
-                ?.asSequence()
-                ?.filter {
-                    it.physicalWidth == currentMode?.physicalWidth &&
-                            it.physicalHeight == currentMode?.physicalHeight
-                }
-                ?.maxByOrNull { it.refreshRate }
-            if (highRefreshMode != null) {
-                window.attributes = window.attributes.apply {
-                    preferredDisplayModeId = highRefreshMode.modeId
-                    preferredRefreshRate = highRefreshMode.refreshRate
-                }
-            }
-        }
         enableEdgeToEdge()
         setContent {
             MainScreen(
