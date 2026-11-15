@@ -46,18 +46,8 @@ fun FavoritesScreen(
     onMediaClick: (Long) -> Unit
 ) {
     val favoriteItems by viewModel.favoriteMediaItems.collectAsState()
-    val useDynamicColor by viewModel.useDynamicColor.collectAsState()
-
-    LaunchedEffect(Unit) {
-        viewModel.loadFavoriteMedia()
-    }
-
     val primaryColor = MaterialTheme.colorScheme.primary
-    val headerBackground = if (useDynamicColor) {
-        Color(0xFF0D0E12)
-    } else {
-        primaryColor.copy(alpha = 0.22f).compositeOver(MaterialTheme.colorScheme.background)
-    }
+    val headerBackground = primaryColor.copy(alpha = 0.22f).compositeOver(MaterialTheme.colorScheme.background)
 
     Scaffold(
         topBar = {

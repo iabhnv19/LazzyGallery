@@ -131,13 +131,8 @@ fun RecycleBinScreen(
         )
     }
 
-    val useDynamicColor by viewModel.useDynamicColor.collectAsState()
     val primaryColor = MaterialTheme.colorScheme.primary
-    val headerBackground = if (useDynamicColor) {
-        androidx.compose.ui.graphics.Color(0xFF0D0E12)
-    } else {
-        primaryColor.copy(alpha = 0.22f).compositeOver(MaterialTheme.colorScheme.background)
-    }
+    val headerBackground = primaryColor.copy(alpha = 0.22f).compositeOver(MaterialTheme.colorScheme.background)
 
     Scaffold(
         topBar = {

@@ -150,6 +150,7 @@ fun MainScreen(
     val useDynamicColor by viewModel.useDynamicColor.collectAsState()
     val accentColorIndex by viewModel.accentColorIndex.collectAsState()
     val defaultStartScreen by viewModel.defaultStartScreen.collectAsState()
+    val rightButtonAction by viewModel.rightButtonAction.collectAsState()
     val startDestination = if (defaultStartScreen == Screen.Albums.route) Screen.Albums.route else Screen.Recent.route
 
     GalleryTheme(
@@ -157,6 +158,16 @@ fun MainScreen(
         dynamicColor = useDynamicColor,
         accentColorIndex = accentColorIndex
     ) {
+        val view = androidx.compose.ui.platform.LocalView.current
+        androidx.compose.runtime.LaunchedEffect(isDarkMode) {
+            val window = (view.context as? Activity)?.window
+            if (window != null) {
+                val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
+                controller.isAppearanceLightStatusBars = !isDarkMode
+                controller.isAppearanceLightNavigationBars = !isDarkMode
+            }
+        }
+
         var hasPermission by remember { mutableStateOf(checkStoragePermissions(context)) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -418,11 +429,42 @@ fun MainScreen(
             ) {
                 FloatingNavigationBar(
                     currentRoute = currentRoute ?: startDestination,
+                    rightButtonAction = rightButtonAction,
                     onNavigate = { route ->
                         navController.navigate(route) {
                             popUpTo(navController.graph.startDestinationId) { saveState = true }
                             launchSingleTop = true
                             restoreState = true
+                        }
+                    },
+                    onRightButtonClick = {
+                        when (rightButtonAction) {
+                            "camera" -> {
+                                try {
+                                    val intent = android.content.Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {
+                                    android.widget.Toast.makeText(context, "Camera not available", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                            "file_manager" -> {
+                                try {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_GET_CONTENT).apply {
+                                        type = "*/*"
+                                        addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                                    }
+                                    context.startActivity(android.content.Intent.createChooser(intent, "Open Files"))
+                                } catch (_: Exception) {
+                                    try {
+                                        val fallback = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                            type = "resource/folder"
+                                        }
+                                        context.startActivity(fallback)
+                                    } catch (_: Exception) {
+                                        android.widget.Toast.makeText(context, "File manager not available", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
                         }
                     }
                 )

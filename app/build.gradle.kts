@@ -33,6 +33,39 @@ android {
     }
 }
 
+tasks.register("buildRustCore") {
+    notCompatibleWithConfigurationCache("cargo-ndk external build process")
+    doLast {
+        val rustDir = File(rootDir.parentFile, "rust_core")
+        val outputDir = File(projectDir, "src/main/jniLibs")
+        if (rustDir.exists()) {
+            try {
+                val pb = ProcessBuilder(
+                    "cargo-ndk",
+                    "-t", "arm64-v8a",
+                    "-t", "armeabi-v7a",
+                    "-t", "x86_64",
+                    "-p", "24",
+                    "-o", outputDir.absolutePath,
+                    "build",
+                    "--release"
+                )
+                pb.directory(rustDir)
+                pb.redirectErrorStream(true)
+                val process = pb.start()
+                val exitCode = process.waitFor()
+                println("cargo-ndk exited with code $exitCode")
+            } catch (e: Exception) {
+                println("Warning: cargo-ndk execution failed: ${e.message}")
+            }
+        }
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("buildRustCore")
+}
+
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

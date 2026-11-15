@@ -12,13 +12,23 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
 import com.lazzy.gallery.data.MediaStoreThumbnailFetcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
 class GalleryApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        // Preload media cache in background on application start for instant cold boot
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val repo = com.lazzy.gallery.data.MediaRepository(this@GalleryApplication)
+                repo.getCachedMediaSync()
+            } catch (_: Exception) { }
+        }
     }
 
     override fun newImageLoader(): ImageLoader {

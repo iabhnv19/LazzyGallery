@@ -97,14 +97,8 @@ fun RecentPhotosScreen(
     val isSelectionMode by viewModel.isSelectionMode.collectAsState()
     val currentSort by viewModel.sortOrder.collectAsState()
     val libraryColumns by viewModel.libraryColumns.collectAsState()
-    val useDynamicColor by viewModel.useDynamicColor.collectAsState()
-
     val primaryColor = MaterialTheme.colorScheme.primary
-    val headerBackground = if (useDynamicColor) {
-        Color(0xFF0D0E12)
-    } else {
-        primaryColor.copy(alpha = 0.22f).compositeOver(MaterialTheme.colorScheme.background)
-    }
+    val headerBackground = primaryColor.copy(alpha = 0.22f).compositeOver(MaterialTheme.colorScheme.background)
 
     var showSortMenu by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }

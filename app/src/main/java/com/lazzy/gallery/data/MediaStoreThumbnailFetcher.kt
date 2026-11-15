@@ -91,6 +91,45 @@ class MediaStoreThumbnailFetcher(
             }
         }
 
+        // Try native Rust decoding via file descriptor first when cache misses
+        try {
+            val pfd = context.contentResolver.openFileDescriptor(uri, "r")
+            if (pfd != null) {
+                val jpegBytes = pfd.use { descriptor ->
+                    RustBridge.nativeDecodeThumbnail(descriptor.fd, 300, 300)
+                }
+                if (jpegBytes != null && jpegBytes.isNotEmpty()) {
+                    val opts = BitmapFactory.Options().apply {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            inPreferredConfig = Bitmap.Config.HARDWARE
+                        }
+                    }
+                    var bitmap = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size, opts)
+                    if (bitmap == null) {
+                        bitmap = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
+                    }
+                    if (bitmap != null) {
+                        diskSaverScope.launch {
+                            try {
+                                val tempFile = File(thumbDir, "$mediaId.tmp")
+                                FileOutputStream(tempFile).use { out ->
+                                    out.write(jpegBytes)
+                                }
+                                tempFile.renameTo(thumbFile)
+                            } catch (_: Exception) { }
+                        }
+
+                        val drawable = BitmapDrawable(context.resources, bitmap)
+                        return@withContext DrawableResult(
+                            drawable = drawable,
+                            isSampled = true,
+                            dataSource = DataSource.DISK
+                        )
+                    }
+                }
+            }
+        } catch (_: Exception) { }
+
         // Ask MediaStore for the thumbnail when the cache misses.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {

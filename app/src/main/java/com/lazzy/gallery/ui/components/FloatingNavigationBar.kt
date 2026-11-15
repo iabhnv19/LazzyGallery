@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -88,11 +90,13 @@ fun Modifier.softDropShadow(
 @Composable
 fun FloatingNavigationBar(
     currentRoute: String,
+    rightButtonAction: String = "favorites",
     onNavigate: (String) -> Unit,
+    onRightButtonClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isSearchSelected = currentRoute == "search"
-    val isFavoritesSelected = currentRoute == "favorites"
+    val isFavoritesSelected = currentRoute == "favorites" && rightButtonAction == "favorites"
 
     val colorAnimationSpec = spring<Color>(
         dampingRatio = 0.75f,
@@ -268,13 +272,29 @@ fun FloatingNavigationBar(
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
-                                onClick = { onNavigate("favorites") }
+                                onClick = {
+                                    if (rightButtonAction == "favorites") {
+                                        onNavigate("favorites")
+                                    } else {
+                                        onRightButtonClick()
+                                    }
+                                }
                             ),
                         contentAlignment = Alignment.Center
                     ) {
+                        val icon = when (rightButtonAction) {
+                            "camera" -> Icons.Default.CameraAlt
+                            "file_manager" -> Icons.Default.Folder
+                            else -> if (isFavoritesSelected) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder
+                        }
+                        val desc = when (rightButtonAction) {
+                            "camera" -> "Camera"
+                            "file_manager" -> "File Manager"
+                            else -> "Favorites"
+                        }
                         Icon(
-                            imageVector = if (isFavoritesSelected) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
-                            contentDescription = "Favorites",
+                            imageVector = icon,
+                            contentDescription = desc,
                             modifier = Modifier.size(24.dp),
                             tint = favoritesContentColor
                         )

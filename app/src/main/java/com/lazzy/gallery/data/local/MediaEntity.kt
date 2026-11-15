@@ -2,10 +2,19 @@ package com.lazzy.gallery.data.local
 
 import android.net.Uri
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.lazzy.gallery.data.MediaModel
 
-@Entity(tableName = "media_index")
+@Entity(
+    tableName = "media_index",
+    indices = [
+        Index(value = ["dateAdded"]),
+        Index(value = ["isTrashed"]),
+        Index(value = ["isHidden"]),
+        Index(value = ["albumName"])
+    ]
+)
 data class MediaEntity(
     @PrimaryKey val id: Long,
     val uriString: String,

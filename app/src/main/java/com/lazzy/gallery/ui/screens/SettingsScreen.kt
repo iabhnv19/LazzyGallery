@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
 import com.lazzy.gallery.ui.navigation.Screen
@@ -87,6 +88,7 @@ fun SettingsScreen(
     val dateTimeFormat by viewModel.dateTimeFormat.collectAsState()
     val showHiddenItems by viewModel.showHiddenItems.collectAsState()
     val defaultStartScreen by viewModel.defaultStartScreen.collectAsState()
+    val rightButtonAction by viewModel.rightButtonAction.collectAsState()
 
     var cacheSizeBytes by remember {
         mutableLongStateOf(getDirectorySize(context.cacheDir))
@@ -94,11 +96,7 @@ fun SettingsScreen(
     val cacheSizeText = remember(cacheSizeBytes) { formatSize(cacheSizeBytes) }
 
     val primaryColor = MaterialTheme.colorScheme.primary
-    val headerBackground = if (useDynamicColor) {
-        androidx.compose.ui.graphics.Color(0xFF0D0E12)
-    } else {
-        primaryColor.copy(alpha = 0.22f).compositeOver(MaterialTheme.colorScheme.background)
-    }
+    val headerBackground = primaryColor.copy(alpha = 0.22f).compositeOver(MaterialTheme.colorScheme.background)
 
     Scaffold(
         topBar = {
@@ -269,6 +267,32 @@ fun SettingsScreen(
                             val next = if (defaultStartScreen == Screen.Albums.route) Screen.Recent.route else Screen.Albums.route
                             viewModel.setDefaultStartScreen(next)
                             Toast.makeText(context, "Default start screen updated", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent)
+                    )
+
+                    ListItem(
+                        headlineContent = { Text("Bottom Right Nav Button") },
+                        supportingContent = {
+                            Text(
+                                when (rightButtonAction) {
+                                    "camera" -> "Camera"
+                                    "file_manager" -> "File Manager"
+                                    else -> "Favorites (Default)"
+                                }
+                            )
+                        },
+                        leadingContent = {
+                            Icon(Icons.Default.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        },
+                        modifier = Modifier.clickable {
+                            val next = when (rightButtonAction) {
+                                "favorites" -> "camera"
+                                "camera" -> "file_manager"
+                                else -> "favorites"
+                            }
+                            viewModel.setRightButtonAction(next)
+                            Toast.makeText(context, "Bottom right button set to $next", Toast.LENGTH_SHORT).show()
                         },
                         colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent)
                     )

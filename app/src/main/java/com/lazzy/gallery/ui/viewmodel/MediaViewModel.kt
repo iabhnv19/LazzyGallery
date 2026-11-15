@@ -100,6 +100,14 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
     private val _defaultStartScreen = MutableStateFlow(repository.getDefaultStartScreen())
     val defaultStartScreen: StateFlow<String> = _defaultStartScreen
 
+    private val _rightButtonAction = MutableStateFlow(repository.getRightButtonAction())
+    val rightButtonAction: StateFlow<String> = _rightButtonAction
+
+    fun setRightButtonAction(action: String) {
+        repository.setRightButtonAction(action)
+        _rightButtonAction.value = action
+    }
+
     fun setLibraryColumns(columns: Int) {
         repository.setLibraryColumns(columns)
         _libraryColumns.value = columns

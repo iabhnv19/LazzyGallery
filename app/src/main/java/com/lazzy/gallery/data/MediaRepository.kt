@@ -120,6 +120,9 @@ class MediaRepository(private val context: Context) {
     fun getDefaultStartScreen(): String = prefs.getString("default_start_screen", "recent") ?: "recent"
     fun setDefaultStartScreen(route: String) = prefs.edit().putString("default_start_screen", route).apply()
 
+    fun getRightButtonAction(): String = prefs.getString("right_button_action", "favorites") ?: "favorites"
+    fun setRightButtonAction(action: String) = prefs.edit().putString("right_button_action", action).apply()
+
     fun getFavoriteIds(): Set<Long> {
         val set = prefs.getStringSet("favorite_ids", emptySet()) ?: emptySet()
         return set.mapNotNull { it.toLongOrNull() }.toSet()
@@ -856,15 +859,29 @@ class MediaRepository(private val context: Context) {
         var focalLength: String? = null
 
         try {
-            context.contentResolver.openInputStream(media.uri)?.use { stream ->
-                val exif = ExifInterface(stream)
-                cameraModel = exif.getAttribute(ExifInterface.TAG_MODEL)
-                aperture = exif.getAttribute(ExifInterface.TAG_F_NUMBER) ?: exif.getAttribute(ExifInterface.TAG_APERTURE_VALUE)
-                iso = exif.getAttribute(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY) ?: @Suppress("DEPRECATION") exif.getAttribute(ExifInterface.TAG_ISO_SPEED_RATINGS)
-                exposureTime = exif.getAttribute(ExifInterface.TAG_EXPOSURE_TIME)
-                focalLength = exif.getAttribute(ExifInterface.TAG_FOCAL_LENGTH)
+            context.contentResolver.openFileDescriptor(media.uri, "r")?.use { pfd ->
+                val json = RustBridge.nativeExtractExif(pfd.fd)
+                if (json != null) {
+                    val obj = org.json.JSONObject(json)
+                    if (obj.has("camera_model") && !obj.isNull("camera_model")) {
+                        cameraModel = obj.getString("camera_model")
+                    }
+                }
             }
         } catch (_: Exception) { }
+
+        if (cameraModel.isNullOrBlank()) {
+            try {
+                context.contentResolver.openInputStream(media.uri)?.use { stream ->
+                    val exif = ExifInterface(stream)
+                    cameraModel = exif.getAttribute(ExifInterface.TAG_MODEL)
+                    aperture = exif.getAttribute(ExifInterface.TAG_F_NUMBER) ?: exif.getAttribute(ExifInterface.TAG_APERTURE_VALUE)
+                    iso = exif.getAttribute(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY) ?: @Suppress("DEPRECATION") exif.getAttribute(ExifInterface.TAG_ISO_SPEED_RATINGS)
+                    exposureTime = exif.getAttribute(ExifInterface.TAG_EXPOSURE_TIME)
+                    focalLength = exif.getAttribute(ExifInterface.TAG_FOCAL_LENGTH)
+                }
+            } catch (_: Exception) { }
+        }
 
         val sizeMb = String.format(Locale.getDefault(), "%.2f MB", media.size / (1024f * 1024f))
         val resolution = if (media.width > 0 && media.height > 0) "${media.width} x ${media.height}" else "Unknown"
@@ -1059,9 +1076,23 @@ class MediaRepository(private val context: Context) {
             for (item in unindexed) {
                 try {
                     val uri = Uri.parse(item.uriString)
-                    val bitmap = loadDownscaledBitmap(context, uri, 1024)
-                    if (bitmap != null) {
-                        val image = com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap, 0)
+                    var bitmap: android.graphics.Bitmap? = null
+                    try {
+                        context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                            val preprocessedBytes = RustBridge.nativePreprocessOcr(pfd.fd)
+                            if (preprocessedBytes != null && preprocessedBytes.isNotEmpty()) {
+                                bitmap = android.graphics.BitmapFactory.decodeByteArray(preprocessedBytes, 0, preprocessedBytes.size)
+                            }
+                        }
+                    } catch (_: Exception) { }
+
+                    if (bitmap == null) {
+                        bitmap = loadDownscaledBitmap(context, uri, 1024)
+                    }
+
+                    val resolvedBitmap = bitmap
+                    if (resolvedBitmap != null) {
+                        val image = com.google.mlkit.vision.common.InputImage.fromBitmap(resolvedBitmap, 0)
                         val text = recognizer.process(image).awaitText().text.trim()
                         val textToSave = if (text.isNotBlank()) text else ""
                         mediaDao.updateOcrText(item.id, textToSave)
