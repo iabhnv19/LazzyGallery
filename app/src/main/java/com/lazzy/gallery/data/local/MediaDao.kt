@@ -20,6 +20,9 @@ interface MediaDao {
     @Query("SELECT * FROM media_index WHERE isTrashed = 0 AND isHidden = 0 ORDER BY dateAdded DESC")
     fun getAllMediaBlocking(): List<MediaEntity>
 
+    @Query("SELECT * FROM media_index WHERE isTrashed = 0 AND isHidden = 0 ORDER BY dateAdded DESC LIMIT :limit")
+    fun getRecentMediaBlocking(limit: Int): List<MediaEntity>
+
     @Query("SELECT id, dateModified FROM media_index")
     suspend fun getExistingIdAndModified(): List<MediaIdModified>
 

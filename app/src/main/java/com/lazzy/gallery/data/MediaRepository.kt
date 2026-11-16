@@ -140,9 +140,9 @@ class MediaRepository(private val context: Context) {
             return snapshot
         }
 
-        // Fall back to Room.
+        // Fall back to Room (load recent batch first for instant startup).
         try {
-            val entities = mediaDao.getAllMediaBlocking()
+            val entities = mediaDao.getRecentMediaBlocking(120)
             val favoriteIds = getFavoriteIds()
             val hiddenIds = getHiddenIds()
             if (entities.isNotEmpty()) {

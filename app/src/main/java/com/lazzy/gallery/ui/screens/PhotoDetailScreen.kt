@@ -357,9 +357,11 @@ fun PhotoDetailScreen(
             }
         }
 
+        var isImageZoomed by remember { mutableStateOf(false) }
+
         HorizontalPager(
             state = pagerState,
-            userScrollEnabled = !showExifSheet,
+            userScrollEnabled = !showExifSheet && !isImageZoomed,
             beyondViewportPageCount = 0,
             key = { page -> mediaItems.getOrNull(page)?.id ?: page },
             modifier = Modifier
@@ -391,6 +393,7 @@ fun PhotoDetailScreen(
                     rotationAngle = if (page == pagerState.currentPage) rotationAngle else 0f,
                     sharedTransitionScope = if (isCurrent) sharedTransitionScope else null,
                     animatedVisibilityScope = if (isCurrent) animatedVisibilityScope else null,
+                    onZoomChanged = { isImageZoomed = it },
                     onToggleControls = { showControls = !showControls }
                 )
             }
@@ -688,6 +691,7 @@ fun ZoomableImageViewer(
     rotationAngle: Float = 0f,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
+    onZoomChanged: (Boolean) -> Unit = {},
     onToggleControls: () -> Unit
 ) {
     val context = LocalContext.current
@@ -695,11 +699,16 @@ fun ZoomableImageViewer(
     var offset by remember(media.id) { mutableStateOf(Offset.Zero) }
     var regionBitmap by remember(media.id) { mutableStateOf<Bitmap?>(null) }
 
+    LaunchedEffect(scale) {
+        onZoomChanged(scale > 1.05f)
+    }
+
     // Reset zoom when this page leaves the pager.
     LaunchedEffect(isCurrentPage) {
         if (!isCurrentPage && scale != 1f) {
             scale = 1f
             offset = Offset.Zero
+            onZoomChanged(false)
         }
     }
 
