@@ -37,6 +37,10 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.ui.platform.LocalContext
+import coil.request.ImageRequest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -115,6 +119,27 @@ fun RecentPhotosScreen(
     var isSelectingRange by remember { mutableStateOf(true) }
     var initialSelectedIdsOnDrag by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var currentDragPosition by remember { mutableStateOf<Offset?>(null) }
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            try {
+                val repo = com.lazzy.gallery.data.MediaRepository(context)
+                val recent = repo.getCachedMediaSync().take(50)
+                val imageLoader = coil.Coil.imageLoader(context)
+                recent.forEach { media ->
+                    val request = ImageRequest.Builder(context)
+                        .data(media.uri)
+                        .size(300, 300)
+                        .memoryCacheKey("thumb_${media.id}")
+                        .diskCacheKey("thumb_${media.id}")
+                        .allowHardware(true)
+                        .build()
+                    imageLoader.execute(request)
+                }
+            } catch (_: Throwable) { }
+        }
+    }
 
     Scaffold(
         topBar = {
