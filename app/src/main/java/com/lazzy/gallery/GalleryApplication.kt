@@ -82,7 +82,7 @@ class GalleryApplication : Application(), ImageLoaderFactory, ComponentCallbacks
             .decoderDispatcher(decoderDispatcher)
             .memoryCache {
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.40)
+                    .maxSizePercent(0.50)
                     .build()
             }
             .diskCache {
