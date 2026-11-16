@@ -278,6 +278,14 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
                 repository.syncMediaStoreWithRoom()
             } catch (_: Exception) { }
 
+            // Silently pre-cache recent thumbnails in background after 2 seconds for instant scroll performance
+            launch {
+                kotlinx.coroutines.delay(2000)
+                try {
+                    repository.aggressivePrecacheThumbnails(150)
+                } catch (_: Throwable) { }
+            }
+
             // Keep the UI in sync with Room.
             launch {
                 repository.observeAllMediaFlow().collect { list ->

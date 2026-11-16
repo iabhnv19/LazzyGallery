@@ -107,7 +107,6 @@ fun RecentPhotosScreen(
     val libraryColumns by viewModel.libraryColumns.collectAsState()
     val primaryColor = MaterialTheme.colorScheme.primary
     val headerBackground = primaryColor.copy(alpha = 0.22f).compositeOver(MaterialTheme.colorScheme.background)
-
     var showSortMenu by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
