@@ -27,12 +27,14 @@ import androidx.paging.map
 import androidx.print.PrintHelper
 import com.lazzy.gallery.data.local.GalleryDatabase
 import com.lazzy.gallery.data.local.MediaEntity
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -527,6 +529,11 @@ class MediaRepository(private val context: Context) {
                     mediaDao.insertAll(entities)
                 } catch (_: Exception) { }
             }
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    aggressivePrecacheThumbnails(1000)
+                } catch (_: Throwable) { }
+            }
             return@withContext
         }
 
@@ -568,6 +575,11 @@ class MediaRepository(private val context: Context) {
                 try {
                     mediaDao.insertAll(entities)
                 } catch (_: Exception) { }
+            }
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    aggressivePrecacheThumbnails(500)
+                } catch (_: Throwable) { }
             }
         }
 
