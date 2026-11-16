@@ -88,7 +88,7 @@ class GalleryApplication : Application(), ImageLoaderFactory, ComponentCallbacks
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(300 * 1024 * 1024)
+                    .maxSizeBytes(600 * 1024 * 1024)
                     .build()
             }
             .components {
