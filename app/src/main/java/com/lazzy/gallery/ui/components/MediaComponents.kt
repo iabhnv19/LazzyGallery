@@ -123,8 +123,7 @@ fun MediaGridThumbnail(
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
             .allowHardware(true)
-            .crossfade(true)
-            .crossfade(180)
+            .crossfade(false)
             .apply {
                 if (media.isVideo) {
                     videoFrameMillis(0)
