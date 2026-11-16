@@ -33,6 +33,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -92,6 +95,7 @@ fun RecentPhotosScreen(
     onIntentSenderRequest: (PendingIntent) -> Unit
 ) {
     val mediaItems by viewModel.mediaItems.collectAsState()
+    val pagedItems = viewModel.pagedMediaItems.collectAsLazyPagingItems()
     val isInitialLoadComplete by viewModel.isInitialLoadComplete.collectAsState()
     val selectedIds by viewModel.selectedIds.collectAsState()
     val isSelectionMode by viewModel.isSelectionMode.collectAsState()
@@ -372,34 +376,37 @@ fun RecentPhotosScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(
-                            items = mediaItems,
-                            key = { it.id },
-                            contentType = { if (it.isVideo) "video_thumbnail" else "photo_thumbnail" }
-                        ) { item ->
-                            val isSelected = selectedIds.contains(item.id)
-                            val onClick = remember(item.id, isSelectionMode) {
-                                {
-                                    if (isSelectionMode) {
-                                        viewModel.toggleSelection(item.id)
-                                    } else {
-                                        viewModel.setCurrentViewedMediaId(item.id)
-                                        onMediaClick(item.id)
+                            count = pagedItems.itemCount,
+                            key = pagedItems.itemKey { it.id },
+                            contentType = pagedItems.itemContentType { if (it.isVideo) "video_thumbnail" else "photo_thumbnail" }
+                        ) { index ->
+                            val item = pagedItems[index]
+                            if (item != null) {
+                                val isSelected = selectedIds.contains(item.id)
+                                val onClick = remember(item.id, isSelectionMode) {
+                                    {
+                                        if (isSelectionMode) {
+                                            viewModel.toggleSelection(item.id)
+                                        } else {
+                                            viewModel.setCurrentViewedMediaId(item.id)
+                                            onMediaClick(item.id)
+                                        }
                                     }
                                 }
+                                val onLongClick = remember(item.id) {
+                                    { viewModel.toggleSelection(item.id) }
+                                }
+                                MediaGridThumbnail(
+                                    media = item,
+                                    isSelected = isSelected,
+                                    isSelectionMode = isSelectionMode,
+                                    isTargetSharedItem = currentViewedId == item.id,
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                    onClick = onClick,
+                                    onLongClick = onLongClick
+                                )
                             }
-                            val onLongClick = remember(item.id) {
-                                { viewModel.toggleSelection(item.id) }
-                            }
-                            MediaGridThumbnail(
-                                media = item,
-                                isSelected = isSelected,
-                                isSelectionMode = isSelectionMode,
-                                isTargetSharedItem = currentViewedId == item.id,
-                                sharedTransitionScope = sharedTransitionScope,
-                                animatedVisibilityScope = animatedVisibilityScope,
-                                onClick = onClick,
-                                onLongClick = onLongClick
-                            )
                         }
                     }
                 }

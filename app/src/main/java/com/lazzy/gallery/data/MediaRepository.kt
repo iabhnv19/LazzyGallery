@@ -19,6 +19,11 @@ import android.os.Looper
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.exifinterface.media.ExifInterface
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.filter
+import androidx.paging.map
 import androidx.print.PrintHelper
 import com.lazzy.gallery.data.local.GalleryDatabase
 import com.lazzy.gallery.data.local.MediaEntity
@@ -621,6 +626,26 @@ class MediaRepository(private val context: Context) {
         return mediaDao.getAllMediaFlow().map { entities ->
             entities.map { it.toMediaModel().copy(isFavorite = favoriteIds.contains(it.id)) }
                 .filter { !hiddenIds.contains(it.id) && !hiddenAlbums.contains(it.albumName) }
+        }
+    }
+
+    fun getPagedMediaFlow(): Flow<PagingData<MediaModel>> {
+        val favoriteIds = getFavoriteIds()
+        val hiddenIds = getHiddenIds()
+        val hiddenAlbums = getHiddenAlbums()
+        return Pager(
+            config = PagingConfig(
+                pageSize = 60,
+                prefetchDistance = 120,
+                enablePlaceholders = false
+            ),
+            pagingSourceFactory = { mediaDao.pagingSource() }
+        ).flow.map { pagingData ->
+            pagingData.map { entity ->
+                entity.toMediaModel().copy(isFavorite = favoriteIds.contains(entity.id))
+            }.filter { model ->
+                !hiddenIds.contains(model.id) && !hiddenAlbums.contains(model.albumName)
+            }
         }
     }
 

@@ -4,6 +4,8 @@ import android.app.PendingIntent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import com.lazzy.gallery.data.Album
 import com.lazzy.gallery.data.AlbumInfo
 import com.lazzy.gallery.data.ExifMetadata
@@ -12,6 +14,7 @@ import com.lazzy.gallery.data.MediaModel
 import com.lazzy.gallery.data.MediaRepository
 import com.lazzy.gallery.data.SortOrder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -255,6 +258,9 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
         SharingStarted.Eagerly,
         emptyList()
     )
+
+    val pagedMediaItems: Flow<PagingData<MediaModel>> = repository.getPagedMediaFlow()
+        .cachedIn(viewModelScope)
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
