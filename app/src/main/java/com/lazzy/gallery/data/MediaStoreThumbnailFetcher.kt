@@ -88,7 +88,36 @@ class MediaStoreThumbnailFetcher(
             }
         }
 
-        // Try native Rust decoding via file descriptor first when cache misses
+        // 1. Try Android's system pre-rendered thumbnail provider first (like Fossify)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val rawBitmap = context.contentResolver.loadThumbnail(uri, AndroidSize(300, 300), null)
+                if (rawBitmap != null) {
+                    val bmpToCompress = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && rawBitmap.config == Bitmap.Config.HARDWARE) {
+                        rawBitmap.copy(Bitmap.Config.RGB_565, false) ?: rawBitmap
+                    } else rawBitmap
+
+                    diskSaverScope.launch {
+                        try {
+                            val tempFile = File(thumbDir, "$mediaId.tmp")
+                            FileOutputStream(tempFile).use { out ->
+                                bmpToCompress.compress(Bitmap.CompressFormat.JPEG, 80, out)
+                            }
+                            tempFile.renameTo(thumbFile)
+                        } catch (_: Throwable) { }
+                    }
+
+                    val drawable = BitmapDrawable(context.resources, rawBitmap)
+                    return@withContext DrawableResult(
+                        drawable = drawable,
+                        isSampled = true,
+                        dataSource = DataSource.DISK
+                    )
+                }
+            } catch (_: Throwable) { }
+        }
+
+        // 2. Fallback to native Rust decoding if system thumbnail misses
         try {
             val pfd = context.contentResolver.openFileDescriptor(uri, "r")
             if (pfd != null) {
@@ -125,49 +154,6 @@ class MediaStoreThumbnailFetcher(
                 }
             }
         } catch (_: Throwable) { }
-
-        // Ask MediaStore for the thumbnail when the cache misses.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            try {
-                val rawBitmap = context.contentResolver.loadThumbnail(uri, AndroidSize(300, 300), null)
-
-                // Save the compressed copy without blocking image loading.
-                val saveBitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && rawBitmap.config == Bitmap.Config.HARDWARE) {
-                    rawBitmap.copy(Bitmap.Config.ARGB_8888, false)
-                } else {
-                    null
-                }
-                val bmpToCompress = saveBitmap ?: rawBitmap
-
-                diskSaverScope.launch {
-                    try {
-                        val tempFile = File(thumbDir, "$mediaId.tmp")
-                        FileOutputStream(tempFile).use { out ->
-                            bmpToCompress.compress(Bitmap.CompressFormat.JPEG, 80, out)
-                        }
-                        tempFile.renameTo(thumbFile)
-                    } catch (_: Exception) {
-                    } finally {
-                        saveBitmap?.recycle()
-                    }
-                }
-
-                // Convert before returning so texture upload does not run during scroll.
-                val hwBitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && rawBitmap.config != Bitmap.Config.HARDWARE) {
-                    val converted = rawBitmap.copy(Bitmap.Config.HARDWARE, false)
-                    if (converted != null) {
-                        converted
-                    } else rawBitmap
-                } else rawBitmap
-
-                val drawable = BitmapDrawable(context.resources, hwBitmap)
-                return@withContext DrawableResult(
-                    drawable = drawable,
-                    isSampled = true,
-                    dataSource = DataSource.DISK
-                )
-            } catch (_: Exception) { }
-        }
         return@withContext null
     }
 

@@ -25,12 +25,11 @@ class GalleryApplication : Application(), ImageLoaderFactory, ComponentCallbacks
     override fun onCreate() {
         super.onCreate()
         registerComponentCallbacks(this)
-        // Preload media cache and aggressively pre-cache recent thumbnails immediately on app start
+        // Preload media cache in background on application start for instant cold boot
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val repo = com.lazzy.gallery.data.MediaRepository(this@GalleryApplication)
                 repo.getCachedMediaSync()
-                repo.aggressivePrecacheThumbnails(200)
             } catch (_: Exception) { }
         }
     }
