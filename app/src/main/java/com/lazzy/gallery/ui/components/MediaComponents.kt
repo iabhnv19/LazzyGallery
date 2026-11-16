@@ -153,7 +153,7 @@ fun MediaGridThumbnail(
     ) {
         AsyncImage(
             model = imageRequest,
-            contentDescription = media.displayName,
+            contentDescription = null,
             modifier = Modifier
                 .fillMaxSize()
                 .then(sharedModifier),

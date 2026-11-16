@@ -1,6 +1,8 @@
 package com.lazzy.gallery
 
 import android.app.Application
+import android.content.ComponentCallbacks2
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Process
 import coil.ImageLoader
@@ -18,10 +20,11 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
-class GalleryApplication : Application(), ImageLoaderFactory {
+class GalleryApplication : Application(), ImageLoaderFactory, ComponentCallbacks2 {
 
     override fun onCreate() {
         super.onCreate()
+        registerComponentCallbacks(this)
         // Preload media cache in background on application start for instant cold boot
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -29,6 +32,26 @@ class GalleryApplication : Application(), ImageLoaderFactory {
                 repo.getCachedMediaSync()
             } catch (_: Exception) { }
         }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE) {
+            try {
+                coil.Coil.imageLoader(this).memoryCache?.clear()
+            } catch (_: Throwable) { }
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        try {
+            coil.Coil.imageLoader(this).memoryCache?.clear()
+        } catch (_: Throwable) { }
     }
 
     override fun newImageLoader(): ImageLoader {
