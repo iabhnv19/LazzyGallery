@@ -12,13 +12,23 @@ import coil.decode.VideoFrameDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
+import com.lazzy.gallery.data.MediaRepository
 import com.lazzy.gallery.data.MediaStoreThumbnailFetcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class GalleryApplication : Application(), ImageLoaderFactory, ComponentCallbacks2 {
 
     override fun onCreate() {
         super.onCreate()
         registerComponentCallbacks(this)
+        // Pre-warm SharedPreferences and Room database off the main thread.
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                MediaRepository.getInstance(this@GalleryApplication)
+            } catch (_: Throwable) { }
+        }
     }
 
     override fun onTrimMemory(level: Int) {

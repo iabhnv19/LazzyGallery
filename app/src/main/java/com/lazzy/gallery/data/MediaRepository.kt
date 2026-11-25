@@ -601,6 +601,14 @@ class MediaRepository(context: Context) {
         }
     }
 
+    suspend fun hasCachedMedia(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            mediaDao.getCount() > 0
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     suspend fun getAllActiveIds(): List<Long> = withContext(Dispatchers.IO) {
         val hiddenIds = getHiddenIds()
         try {

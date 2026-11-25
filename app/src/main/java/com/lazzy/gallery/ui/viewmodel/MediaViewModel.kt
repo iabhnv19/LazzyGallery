@@ -270,13 +270,7 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            // Single-flight MediaStore delta sync in background; PagingSource + Room Flows update UI.
-            try {
-                repository.syncMediaStoreWithRoom()
-            } catch (_: Exception) { }
-            _isInitialLoadComplete.value = true
-
-            // Observe SQL-grouped albums directly from Room.
+            // Observe SQL-grouped albums immediately from Room.
             launch {
                 repository.observeAlbumsFlow().collect { albumList ->
                     if (_albums.value != albumList) {
@@ -284,6 +278,18 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
                     }
                 }
             }
+
+            val hasCache = repository.hasCachedMedia()
+            if (hasCache) {
+                _isInitialLoadComplete.value = true
+                // Defer MediaStore delta sync so first-frame PagingSource + visible thumbnails load uncontended.
+                kotlinx.coroutines.delay(1200)
+            }
+
+            try {
+                repository.syncMediaStoreWithRoom()
+            } catch (_: Exception) { }
+            _isInitialLoadComplete.value = true
 
             // Listen for external MediaStore changes (after initial cold boot).
             launch {
