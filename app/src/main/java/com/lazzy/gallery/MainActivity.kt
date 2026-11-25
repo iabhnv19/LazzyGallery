@@ -117,7 +117,7 @@ fun MainScreen(
     val currentRoute = navBackStackEntry?.destination?.route
 
     val context = LocalContext.current
-    val repository = remember { MediaRepository(context) }
+    val repository = remember { MediaRepository.getInstance(context) }
     val viewModel: MediaViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")

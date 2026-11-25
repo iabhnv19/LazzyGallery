@@ -16,7 +16,7 @@ class MediaSyncWorker(
 
     override suspend fun doWork(): Result {
         return try {
-            val repository = MediaRepository(applicationContext)
+            val repository = MediaRepository.getInstance(applicationContext)
             repository.syncMediaStoreWithRoom()
             Result.success()
         } catch (_: Exception) {

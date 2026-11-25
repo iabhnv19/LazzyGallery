@@ -41,23 +41,22 @@ class MediaStoreThumbnailFetcher(
             } catch (_: Throwable) { }
         }
 
-        // 2. Fallback to native Rust decoding if system thumbnail misses.
+        // 2. Fallback to native Rust decoding if system thumbnail misses (raw RGBA8888, zero JPEG re-encode).
         try {
             val pfd = context.contentResolver.openFileDescriptor(uri, "r")
             if (pfd != null) {
-                val jpegBytes = pfd.use { descriptor ->
-                    RustBridge.nativeDecodeThumbnail(descriptor.fd, 300, 300)
+                val rgbaBytes = pfd.use { descriptor ->
+                    RustBridge.nativeDecodeThumbnailRgba(descriptor.fd, 300, 300)
                 }
-                if (jpegBytes != null && jpegBytes.isNotEmpty()) {
-                    val opts = BitmapFactory.Options().apply {
-                        inPreferredConfig = Bitmap.Config.RGB_565
-                        inMutable = false
-                    }
-                    var bitmap = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size, opts)
-                    if (bitmap == null) {
-                        bitmap = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
-                    }
-                    if (bitmap != null) {
+                if (rgbaBytes != null && rgbaBytes.size > 8) {
+                    val header = java.nio.ByteBuffer.wrap(rgbaBytes, 0, 8)
+                        .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                    val w = header.int
+                    val h = header.int
+                    val expectedSize = 8 + w * h * 4
+                    if (w > 0 && h > 0 && rgbaBytes.size >= expectedSize) {
+                        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                        bitmap.copyPixelsFromBuffer(java.nio.ByteBuffer.wrap(rgbaBytes, 8, w * h * 4))
                         val drawable = BitmapDrawable(context.resources, bitmap)
                         return@withContext DrawableResult(
                             drawable = drawable,

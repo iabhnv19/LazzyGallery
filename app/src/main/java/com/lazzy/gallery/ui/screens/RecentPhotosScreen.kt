@@ -138,8 +138,10 @@ fun RecentPhotosScreen(
                             Icon(Icons.Default.Share, contentDescription = "Share Selected")
                         }
                         IconButton(onClick = {
-                            val intent = viewModel.trashSelectedMedia()
-                            intent?.let { onIntentSenderRequest(it) }
+                            coroutineScope.launch {
+                                val intent = viewModel.trashSelectedMedia()
+                                intent?.let { onIntentSenderRequest(it) }
+                            }
                         }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete Selected")
                         }

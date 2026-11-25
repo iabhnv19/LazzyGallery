@@ -12,7 +12,9 @@ import com.lazzy.gallery.data.MediaModel
         Index(value = ["dateAdded"]),
         Index(value = ["isTrashed"]),
         Index(value = ["isHidden"]),
-        Index(value = ["albumName"])
+        Index(value = ["albumName"]),
+        Index(value = ["isTrashed", "isHidden", "dateAdded"]),
+        Index(value = ["albumName", "isTrashed", "isHidden", "dateAdded"])
     ]
 )
 data class MediaEntity(

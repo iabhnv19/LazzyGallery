@@ -229,10 +229,12 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
     }
 
     val mediaItems: StateFlow<List<MediaModel>> = combine(
+        repository.observeAllMediaFlow(),
         _rawMediaItems,
         _sortOrder,
         _filterType
-    ) { items, sort, filter ->
+    ) { dbItems, rawOverride, sort, filter ->
+        val items = if (dbItems.isNotEmpty()) dbItems else rawOverride
         val filtered = when (filter) {
             FilterType.ALL -> items
             FilterType.IMAGES_ONLY -> items.filter { !it.isVideo }
@@ -268,39 +270,17 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            // Show cached data immediately while the database syncs.
-            try {
-                val cached = repository.getCachedMediaSync()
-                if (cached.isNotEmpty()) {
-                    updateMediaState(cached)
-                    _isInitialLoadComplete.value = true
-                }
-            } catch (_: Exception) { }
-
-            // Single-flight MediaStore delta sync in background.
+            // Single-flight MediaStore delta sync in background; PagingSource + Room Flows update UI.
             try {
                 repository.syncMediaStoreWithRoom()
             } catch (_: Exception) { }
+            _isInitialLoadComplete.value = true
 
             // Observe SQL-grouped albums directly from Room.
             launch {
                 repository.observeAlbumsFlow().collect { albumList ->
                     if (_albums.value != albumList) {
                         _albums.value = albumList
-                    }
-                }
-            }
-
-            // Keep the in-memory list in sync with Room for Search/Detail/Favorites.
-            launch {
-                repository.observeAllMediaFlow().collect { list ->
-                    val currentIds = _rawMediaItems.value.map { it.id }
-                    val newIds = list.map { it.id }
-                    if (currentIds != newIds) {
-                        updateMediaState(list)
-                        if (list.isNotEmpty()) {
-                            _isInitialLoadComplete.value = true
-                        }
                     }
                 }
             }
@@ -459,8 +439,11 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
     }
 
     fun selectAll() {
-        _selectedIds.value = mediaItems.value.map { it.id }.toSet()
-        _isSelectionMode.value = mediaItems.value.isNotEmpty()
+        viewModelScope.launch(Dispatchers.IO) {
+            val allIds = repository.getAllActiveIds().toSet()
+            _selectedIds.value = allIds
+            _isSelectionMode.value = allIds.isNotEmpty()
+        }
     }
 
     fun trashMedia(uris: List<Uri>): PendingIntent? {
@@ -475,16 +458,24 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
         return repository.createDeleteIntent(uris)
     }
 
-    fun trashSelectedMedia(): PendingIntent? {
-        val uris = mediaItems.value.filter { _selectedIds.value.contains(it.id) }.map { it.uri }
+    suspend fun trashSelectedMedia(): PendingIntent? {
+        val ids = _selectedIds.value.toList()
         clearSelection()
+        if (ids.isEmpty()) return null
+        val uris = repository.getUrisByIds(ids)
         return trashMedia(uris)
     }
 
     fun shareSelectedMedia() {
-        val uris = mediaItems.value.filter { _selectedIds.value.contains(it.id) }.map { it.uri }
+        val ids = _selectedIds.value.toList()
         clearSelection()
-        repository.shareMedia(uris)
+        if (ids.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val uris = repository.getUrisByIds(ids)
+            if (uris.isNotEmpty()) {
+                repository.shareMedia(uris)
+            }
+        }
     }
 
     fun shareSingleMedia(media: MediaModel) {

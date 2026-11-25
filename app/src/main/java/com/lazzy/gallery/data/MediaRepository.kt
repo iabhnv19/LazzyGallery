@@ -50,9 +50,20 @@ object GlobalMediaCache {
     var isInitialized: Boolean = false
 }
 
-class MediaRepository(private val context: Context) {
+class MediaRepository(context: Context) {
+
+    private val context: Context = context.applicationContext
 
     companion object {
+        @Volatile
+        private var INSTANCE: MediaRepository? = null
+
+        fun getInstance(context: Context): MediaRepository {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: MediaRepository(context.applicationContext).also { INSTANCE = it }
+            }
+        }
+
         private val syncMutex = Mutex()
         @Volatile
         private var lastSyncTimeMs: Long = 0L
@@ -388,12 +399,12 @@ class MediaRepository(private val context: Context) {
         }
         prefs.edit().putStringSet("local_trashed_ids", current.map { it.toString() }.toSet()).apply()
 
-        try {
-            val dao = mediaDao
-            kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+        val dao = mediaDao
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
                 dao.updateTrashed(mediaIds, isTrashed)
-            }
-        } catch (_: Exception) { }
+            } catch (_: Exception) { }
+        }
     }
 
     @OptIn(FlowPreview::class)
@@ -587,8 +598,27 @@ class MediaRepository(private val context: Context) {
                 .filter { !hiddenIds.contains(it.id) }
             GlobalMediaCache.cachedMedia = updatedModels
             GlobalMediaCache.isInitialized = true
-            saveSnapshot(updatedModels)
         }
+    }
+
+    suspend fun getAllActiveIds(): List<Long> = withContext(Dispatchers.IO) {
+        val hiddenIds = getHiddenIds()
+        try {
+            mediaDao.getAllActiveIds().filter { !hiddenIds.contains(it) }
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun getUrisByIds(ids: List<Long>): List<Uri> = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext emptyList()
+        val result = mutableListOf<Uri>()
+        ids.chunked(400).forEach { chunk ->
+            try {
+                mediaDao.getUriStringsByIds(chunk).forEach { result.add(Uri.parse(it)) }
+            } catch (_: Exception) { }
+        }
+        result
     }
 
     suspend fun fetchAllMedia(includeTrashed: Boolean = false, includeHidden: Boolean = false): List<MediaModel> = withContext(Dispatchers.IO) {
@@ -1233,45 +1263,75 @@ class MediaRepository(private val context: Context) {
 
         val hashedItems = mutableListOf<Pair<MediaModel, Long>>()
         var scanned = 0
-        for (item in allMedia) {
-            var hash = 0L
+        val batchSize = 16
+
+        for (chunk in allMedia.chunked(batchSize)) {
+            val openPfds = mutableListOf<Pair<com.lazzy.gallery.data.local.MediaEntity, android.os.ParcelFileDescriptor>>()
             try {
-                context.contentResolver.openFileDescriptor(Uri.parse(item.uriString), "r")?.use { pfd ->
-                    hash = RustBridge.nativeComputePHash(pfd.fd)
+                for (item in chunk) {
+                    try {
+                        val pfd = context.contentResolver.openFileDescriptor(Uri.parse(item.uriString), "r")
+                        if (pfd != null) {
+                            openPfds.add(item to pfd)
+                        } else {
+                            scanned++
+                        }
+                    } catch (_: Throwable) {
+                        scanned++
+                    }
                 }
-            } catch (_: Throwable) { }
-            if (hash != 0L) {
-                hashedItems.add(item.toMediaModel() to hash)
+
+                if (openPfds.isNotEmpty()) {
+                    val fds = IntArray(openPfds.size) { openPfds[it].second.fd }
+                    val hashes = RustBridge.nativeComputePHashesBatch(fds)
+                    if (hashes != null && hashes.size == openPfds.size) {
+                        for (idx in openPfds.indices) {
+                            val hash = hashes[idx]
+                            if (hash != 0L) {
+                                hashedItems.add(openPfds[idx].first.toMediaModel() to hash)
+                            }
+                        }
+                    } else {
+                        for ((entity, pfd) in openPfds) {
+                            val hash = RustBridge.nativeComputePHash(pfd.fd)
+                            if (hash != 0L) {
+                                hashedItems.add(entity.toMediaModel() to hash)
+                            }
+                        }
+                    }
+                    scanned += openPfds.size
+                }
+            } finally {
+                openPfds.forEach { (_, pfd) ->
+                    try { pfd.close() } catch (_: Throwable) { }
+                }
             }
-            scanned++
             onProgress(scanned, total)
         }
 
-        val visited = mutableSetOf<Long>()
-        val duplicateGroups = mutableListOf<List<MediaModel>>()
+        if (hashedItems.size < 2) return@withContext emptyList()
 
-        for (i in 0 until hashedItems.size) {
-            val (itemA, hashA) = hashedItems[i]
-            if (visited.contains(itemA.id)) continue
-
-            val group = mutableListOf(itemA)
-            for (j in i + 1 until hashedItems.size) {
-                val (itemB, hashB) = hashedItems[j]
-                if (visited.contains(itemB.id)) continue
-
-                val distance = java.lang.Long.bitCount(hashA xor hashB)
-                if (distance <= 6) {
-                    group.add(itemB)
-                    visited.add(itemB.id)
+        val hashArray = LongArray(hashedItems.size) { hashedItems[it].second }
+        val groupedIndices = RustBridge.nativeGroupDuplicateHashes(hashArray, 6)
+        if (groupedIndices != null) {
+            val duplicateGroups = mutableListOf<List<MediaModel>>()
+            var currentGroup = mutableListOf<MediaModel>()
+            for (idx in groupedIndices) {
+                if (idx == -1) {
+                    if (currentGroup.size > 1) {
+                        duplicateGroups.add(currentGroup)
+                    }
+                    currentGroup = mutableListOf()
+                } else if (idx in hashedItems.indices) {
+                    currentGroup.add(hashedItems[idx].first)
                 }
             }
-
-            if (group.size > 1) {
-                visited.add(itemA.id)
-                duplicateGroups.add(group)
+            if (currentGroup.size > 1) {
+                duplicateGroups.add(currentGroup)
             }
+            return@withContext duplicateGroups
         }
 
-        duplicateGroups
+        emptyList()
     }
 }

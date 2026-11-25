@@ -56,6 +56,12 @@ interface MediaDao {
     @Query("SELECT COUNT(*) FROM media_index WHERE isTrashed = 0")
     suspend fun getCount(): Int
 
+    @Query("SELECT id FROM media_index WHERE isTrashed = 0 AND isHidden = 0 ORDER BY dateAdded DESC")
+    suspend fun getAllActiveIds(): List<Long>
+
+    @Query("SELECT uriString FROM media_index WHERE id IN (:ids)")
+    suspend fun getUriStringsByIds(ids: List<Long>): List<String>
+
     @Query("SELECT * FROM media_index WHERE isTrashed = 1 ORDER BY dateAdded DESC")
     suspend fun getTrashedMedia(): List<MediaEntity>
 

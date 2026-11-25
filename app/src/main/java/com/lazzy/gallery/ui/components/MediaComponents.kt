@@ -178,10 +178,12 @@ fun MediaGridThumbnail(
                         modifier = Modifier.size(12.dp),
                         tint = Color.White
                     )
-                    val totalSecs = media.duration / 1000
-                    val mins = totalSecs / 60
-                    val secs = totalSecs % 60
-                    val durationText = String.format(Locale.getDefault(), "%02d:%02d", mins, secs)
+                    val durationText = remember(media.duration) {
+                        val totalSecs = media.duration / 1000
+                        val mins = totalSecs / 60
+                        val secs = totalSecs % 60
+                        String.format(Locale.getDefault(), "%02d:%02d", mins, secs)
+                    }
                     Text(
                         text = durationText,
                         style = MaterialTheme.typography.labelSmall.copy(
