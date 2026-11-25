@@ -34,8 +34,10 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
@@ -51,6 +53,11 @@ object GlobalMediaCache {
 class MediaRepository(private val context: Context) {
 
     companion object {
+        private val syncMutex = Mutex()
+        @Volatile
+        private var lastSyncTimeMs: Long = 0L
+        private const val SYNC_COOLDOWN_MS = 5_000L
+
         // Columns used when querying images.
         val imageProjection = arrayOf(
             MediaStore.Images.Media._ID,
@@ -489,7 +496,18 @@ class MediaRepository(private val context: Context) {
         result
     }
 
-    suspend fun syncMediaStoreWithRoom(): Unit = withContext(Dispatchers.IO) {
+    suspend fun syncMediaStoreWithRoom(force: Boolean = false): Unit = withContext(Dispatchers.IO) {
+        syncMutex.withLock {
+            val now = System.currentTimeMillis()
+            if (!force && lastSyncTimeMs != 0L && (now - lastSyncTimeMs) < SYNC_COOLDOWN_MS) {
+                return@withContext
+            }
+            syncMediaStoreWithRoomInternal()
+            lastSyncTimeMs = System.currentTimeMillis()
+        }
+    }
+
+    private suspend fun syncMediaStoreWithRoomInternal() {
         val existingRoomMap = try {
             mediaDao.getExistingIdAndModified().associate { it.id to it.dateModified }
         } catch (_: Exception) {
@@ -529,12 +547,7 @@ class MediaRepository(private val context: Context) {
                     mediaDao.insertAll(entities)
                 } catch (_: Exception) { }
             }
-            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    aggressivePrecacheThumbnails(1000)
-                } catch (_: Throwable) { }
-            }
-            return@withContext
+            return
         }
 
         // Remove items deleted outside the app.
@@ -545,10 +558,6 @@ class MediaRepository(private val context: Context) {
                 try {
                     mediaDao.deleteByIds(chunk)
                 } catch (_: Exception) { }
-            }
-            val thumbDir = File(context.cacheDir, "thumbnails")
-            deletedIds.forEach { id ->
-                try { File(thumbDir, "$id.jpg").delete() } catch (_: Exception) { }
             }
         }
 
@@ -561,25 +570,12 @@ class MediaRepository(private val context: Context) {
         val newIds = mediaStoreMap.keys - existingRoomMap.keys
         val newOrModifiedIds = modifiedIds + newIds
 
-        // A changed item needs a new thumbnail; a new item has no cache yet.
-        if (modifiedIds.isNotEmpty()) {
-            val thumbDir = File(context.cacheDir, "thumbnails")
-            modifiedIds.forEach { id ->
-                try { File(thumbDir, "$id.jpg").delete() } catch (_: Exception) { }
-            }
-        }
-
         if (newOrModifiedIds.isNotEmpty()) {
             val entities = queryEntitiesForIds(newOrModifiedIds)
             if (entities.isNotEmpty()) {
                 try {
                     mediaDao.insertAll(entities)
                 } catch (_: Exception) { }
-            }
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    aggressivePrecacheThumbnails(500)
-                } catch (_: Throwable) { }
             }
         }
 
@@ -641,17 +637,49 @@ class MediaRepository(private val context: Context) {
         }
     }
 
-    fun getPagedMediaFlow(): Flow<PagingData<MediaModel>> {
+    fun observeAlbumsFlow(): Flow<List<Album>> {
+        return mediaDao.getAlbumSummariesFlow().map { rows ->
+            val pinned = getPinnedAlbums()
+            val hidden = getHiddenAlbums()
+            rows.filter { !hidden.contains(it.albumName) }
+                .map { row ->
+                    Album(
+                        name = row.albumName,
+                        coverUri = Uri.parse(row.coverUriString),
+                        mediaCount = row.mediaCount,
+                        isPinned = pinned.contains(row.albumName)
+                    )
+                }
+                .sortedWith(
+                    compareByDescending<Album> { it.isPinned }
+                        .thenByDescending { it.mediaCount }
+                )
+        }
+    }
+
+    fun getPagedMediaFlow(sortOrder: SortOrder = SortOrder.DATE_DESC): Flow<PagingData<MediaModel>> {
         val favoriteIds = getFavoriteIds()
         val hiddenIds = getHiddenIds()
         val hiddenAlbums = getHiddenAlbums()
+        val orderClause = when (sortOrder) {
+            SortOrder.DATE_DESC -> "dateAdded DESC"
+            SortOrder.DATE_ASC -> "dateAdded ASC"
+            SortOrder.NAME_ASC -> "displayName COLLATE NOCASE ASC"
+            SortOrder.NAME_DESC -> "displayName COLLATE NOCASE DESC"
+            SortOrder.SIZE_DESC -> "size DESC"
+            SortOrder.SIZE_ASC -> "size ASC"
+        }
+        val sql = "SELECT * FROM media_index WHERE isTrashed = 0 AND isHidden = 0 ORDER BY $orderClause"
         return Pager(
             config = PagingConfig(
-                pageSize = 60,
-                prefetchDistance = 120,
+                pageSize = 40,
+                prefetchDistance = 30,
+                initialLoadSize = 60,
                 enablePlaceholders = false
             ),
-            pagingSourceFactory = { mediaDao.pagingSource() }
+            pagingSourceFactory = {
+                mediaDao.pagingSourceRaw(androidx.sqlite.db.SimpleSQLiteQuery(sql))
+            }
         ).flow.map { pagingData ->
             pagingData.map { entity ->
                 entity.toMediaModel().copy(isFavorite = favoriteIds.contains(entity.id))

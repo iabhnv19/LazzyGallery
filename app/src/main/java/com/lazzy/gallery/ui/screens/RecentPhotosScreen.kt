@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,14 +32,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.compose.itemContentType
-import androidx.paging.compose.itemKey
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.ui.platform.LocalContext
-import coil.request.ImageRequest
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -55,18 +47,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
+import coil.request.ImageRequest
 import com.lazzy.gallery.ui.components.ExpressiveSortDropdownMenu
 import com.lazzy.gallery.ui.components.MediaGridThumbnail
 import com.lazzy.gallery.ui.viewmodel.MediaViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -98,7 +95,6 @@ fun RecentPhotosScreen(
     onMediaClick: (Long) -> Unit,
     onIntentSenderRequest: (PendingIntent) -> Unit
 ) {
-    val mediaItems by viewModel.mediaItems.collectAsState()
     val pagedItems = viewModel.pagedMediaItems.collectAsLazyPagingItems()
     val isInitialLoadComplete by viewModel.isInitialLoadComplete.collectAsState()
     val selectedIds by viewModel.selectedIds.collectAsState()
@@ -118,27 +114,6 @@ fun RecentPhotosScreen(
     var isSelectingRange by remember { mutableStateOf(true) }
     var initialSelectedIdsOnDrag by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var currentDragPosition by remember { mutableStateOf<Offset?>(null) }
-    val context = LocalContext.current
-
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.withContext(Dispatchers.IO) {
-            try {
-                val repo = com.lazzy.gallery.data.MediaRepository(context)
-                val recent = repo.getCachedMediaSync().take(50)
-                val imageLoader = coil.Coil.imageLoader(context)
-                recent.forEach { media ->
-                    val request = ImageRequest.Builder(context)
-                        .data(media.uri)
-                        .size(300, 300)
-                        .memoryCacheKey("thumb_${media.id}")
-                        .diskCacheKey("thumb_${media.id}")
-                        .allowHardware(true)
-                        .build()
-                    imageLoader.execute(request)
-                }
-            } catch (_: Throwable) { }
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -229,7 +204,7 @@ fun RecentPhotosScreen(
                 Box(
                     modifier = Modifier.fillMaxSize()
             ) {
-                if (mediaItems.isEmpty()) {
+                if (pagedItems.itemCount == 0 && pagedItems.loadState.refresh is androidx.paging.LoadState.NotLoading) {
                     if (isInitialLoadComplete) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -248,7 +223,9 @@ fun RecentPhotosScreen(
 
                     LaunchedEffect(currentViewedId) {
                         currentViewedId?.let { id ->
-                            val index = mediaItems.indexOfFirst { it.id == id }
+                            val index = (0 until pagedItems.itemCount).firstOrNull {
+                                pagedItems.peek(it)?.id == id
+                            } ?: -1
                             if (index >= 0) {
                                 gridState.scrollToItem(index)
                             }
@@ -264,7 +241,7 @@ fun RecentPhotosScreen(
                                         if (dragStartIndex >= 0) {
                                             val start = min(dragStartIndex, idx)
                                             val end = max(dragStartIndex, idx)
-                                            val rangeIds = (start..end).mapNotNull { mediaItems.getOrNull(it)?.id }.toSet()
+                                            val rangeIds = (start..end).mapNotNull { pagedItems.peek(it)?.id }.toSet()
                                             val updated = if (isSelectingRange) {
                                                 initialSelectedIdsOnDrag + rangeIds
                                             } else {
@@ -283,7 +260,7 @@ fun RecentPhotosScreen(
                         Modifier
                             .fillMaxSize()
                             .padding(horizontal = 8.dp)
-                            .pointerInput(isSelectionMode, mediaItems) {
+                            .pointerInput(isSelectionMode) {
                                 val viewConfig = viewConfiguration
                                 val holdTimeout = 160L
                                 val touchSlop = viewConfig.touchSlop
@@ -318,7 +295,7 @@ fun RecentPhotosScreen(
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         dragStartIndex = startIdx
                                         initialSelectedIdsOnDrag = viewModel.selectedIds.value
-                                        val startItem = mediaItems.getOrNull(startIdx)
+                                        val startItem = pagedItems.peek(startIdx)
                                         if (startItem != null) {
                                             val willSelect = !initialSelectedIdsOnDrag.contains(startItem.id)
                                             isSelectingRange = willSelect
@@ -346,7 +323,7 @@ fun RecentPhotosScreen(
                                             if (currentIdx != null) {
                                                 val start = min(startIdx, currentIdx)
                                                 val end = max(startIdx, currentIdx)
-                                                val rangeIds = (start..end).mapNotNull { mediaItems.getOrNull(it)?.id }.toSet()
+                                                val rangeIds = (start..end).mapNotNull { pagedItems.peek(it)?.id }.toSet()
                                                 val newSelection = if (isSelectingRange) {
                                                     initialSelectedIdsOnDrag + rangeIds
                                                 } else {

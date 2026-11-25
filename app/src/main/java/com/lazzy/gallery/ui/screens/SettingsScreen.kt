@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
-import com.lazzy.gallery.ui.navigation.Screen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayArrow
@@ -66,6 +65,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lazzy.gallery.ui.navigation.Screen
 import com.lazzy.gallery.ui.theme.AccentPalettes
 import com.lazzy.gallery.ui.viewmodel.MediaViewModel
 import java.io.File

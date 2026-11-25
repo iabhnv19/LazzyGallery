@@ -4,11 +4,18 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
 import androidx.room.Transaction
-import androidx.paging.PagingSource
+import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 
 data class MediaIdModified(val id: Long, val dateModified: Long)
+
+data class AlbumSummaryRow(
+    val albumName: String,
+    val coverUriString: String,
+    val mediaCount: Int
+)
 
 @Dao
 interface MediaDao {
@@ -26,6 +33,22 @@ interface MediaDao {
 
     @Query("SELECT * FROM media_index WHERE isTrashed = 0 AND isHidden = 0 ORDER BY dateAdded DESC")
     fun pagingSource(): androidx.paging.PagingSource<Int, MediaEntity>
+
+    @RawQuery(observedEntities = [MediaEntity::class])
+    fun pagingSourceRaw(query: SupportSQLiteQuery): androidx.paging.PagingSource<Int, MediaEntity>
+
+    @Query("""
+        SELECT albumName,
+               (SELECT uriString FROM media_index m2
+                WHERE m2.albumName = m1.albumName AND m2.isTrashed = 0 AND m2.isHidden = 0
+                ORDER BY m2.dateAdded DESC LIMIT 1) AS coverUriString,
+               COUNT(*) AS mediaCount
+        FROM media_index m1
+        WHERE isTrashed = 0 AND isHidden = 0
+        GROUP BY albumName
+        ORDER BY mediaCount DESC
+    """)
+    fun getAlbumSummariesFlow(): Flow<List<AlbumSummaryRow>>
 
     @Query("SELECT id, dateModified FROM media_index")
     suspend fun getExistingIdAndModified(): List<MediaIdModified>

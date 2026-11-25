@@ -14,11 +14,13 @@ import com.lazzy.gallery.data.MediaModel
 import com.lazzy.gallery.data.MediaRepository
 import com.lazzy.gallery.data.SortOrder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -255,16 +257,18 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
     .flowOn(Dispatchers.Default)
     .stateIn(
         viewModelScope,
-        SharingStarted.Eagerly,
+        SharingStarted.WhileSubscribed(5_000),
         emptyList()
     )
 
-    val pagedMediaItems: Flow<PagingData<MediaModel>> = repository.getPagedMediaFlow()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val pagedMediaItems: Flow<PagingData<MediaModel>> = _sortOrder
+        .flatMapLatest { sort -> repository.getPagedMediaFlow(sort) }
         .cachedIn(viewModelScope)
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            // Show cached data while the database syncs.
+            // Show cached data immediately while the database syncs.
             try {
                 val cached = repository.getCachedMediaSync()
                 if (cached.isNotEmpty()) {
@@ -273,20 +277,21 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
                 }
             } catch (_: Exception) { }
 
-            // Sync MediaStore with Room immediately on startup in background.
+            // Single-flight MediaStore delta sync in background.
             try {
                 repository.syncMediaStoreWithRoom()
             } catch (_: Exception) { }
 
-            // Silently pre-cache recent thumbnails in background after 2 seconds for instant scroll performance
+            // Observe SQL-grouped albums directly from Room.
             launch {
-                kotlinx.coroutines.delay(2000)
-                try {
-                    repository.aggressivePrecacheThumbnails(150)
-                } catch (_: Throwable) { }
+                repository.observeAlbumsFlow().collect { albumList ->
+                    if (_albums.value != albumList) {
+                        _albums.value = albumList
+                    }
+                }
             }
 
-            // Keep the UI in sync with Room.
+            // Keep the in-memory list in sync with Room for Search/Detail/Favorites.
             launch {
                 repository.observeAllMediaFlow().collect { list ->
                     val currentIds = _rawMediaItems.value.map { it.id }
@@ -300,11 +305,10 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
                 }
             }
 
-            // Listen for changes made by other apps (after initial cold boot).
+            // Listen for external MediaStore changes (after initial cold boot).
             launch {
-                kotlinx.coroutines.delay(3500)
+                kotlinx.coroutines.delay(5000)
                 repository.observeMediaStoreChanges().collect {
-                    // Refresh Room so its flow can update the UI.
                     repository.syncMediaStoreWithRoom()
                 }
             }
@@ -313,7 +317,7 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
 
     fun forceRefreshMediaStore() {
         viewModelScope.launch(Dispatchers.IO) {
-            repository.syncMediaStoreWithRoom()
+            repository.syncMediaStoreWithRoom(force = true)
             val loaded = repository.fetchAllMedia()
             updateMediaState(loaded)
             _isInitialLoadComplete.value = true
@@ -348,7 +352,6 @@ class MediaViewModel(private val repository: MediaRepository) : ViewModel() {
         if (_favoriteMediaItems.value != favs) {
             _favoriteMediaItems.value = favs
         }
-        recomputeAlbums(list)
     }
 
     fun togglePinAlbum(albumName: String) {

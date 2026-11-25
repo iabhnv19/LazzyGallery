@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.ComponentCallbacks2
 import android.content.res.Configuration
 import android.os.Build
-import android.os.Process
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.GifDecoder
@@ -14,24 +13,12 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
 import com.lazzy.gallery.data.MediaStoreThumbnailFetcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.launch
-import java.util.concurrent.Executors
 
 class GalleryApplication : Application(), ImageLoaderFactory, ComponentCallbacks2 {
 
     override fun onCreate() {
         super.onCreate()
         registerComponentCallbacks(this)
-        // Preload media cache in background on application start for instant cold boot
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val repo = com.lazzy.gallery.data.MediaRepository(this@GalleryApplication)
-                repo.getCachedMediaSync()
-            } catch (_: Exception) { }
-        }
     }
 
     override fun onTrimMemory(level: Int) {
@@ -55,40 +42,16 @@ class GalleryApplication : Application(), ImageLoaderFactory, ComponentCallbacks
     }
 
     override fun newImageLoader(): ImageLoader {
-        // Optimized 3-thread linear queue with LOWEST priority to decode thumbnails
-        // ultra-fast without ever competing for UI thread resources.
-        val decoderDispatcher = Executors.newFixedThreadPool(3) { runnable ->
-            Thread {
-                Process.setThreadPriority(Process.THREAD_PRIORITY_LOWEST)
-                runnable.run()
-            }.apply {
-                name = "gallery-decoder"
-                isDaemon = true
-            }
-        }.asCoroutineDispatcher()
-
-        val fetcherDispatcher = Executors.newFixedThreadPool(3) { runnable ->
-            Thread {
-                Process.setThreadPriority(Process.THREAD_PRIORITY_LOWEST)
-                runnable.run()
-            }.apply {
-                name = "gallery-fetcher"
-                isDaemon = true
-            }
-        }.asCoroutineDispatcher()
-
         return ImageLoader.Builder(this)
-            .fetcherDispatcher(fetcherDispatcher)
-            .decoderDispatcher(decoderDispatcher)
             .memoryCache {
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.40)
+                    .maxSizePercent(0.25)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(600 * 1024 * 1024)
+                    .maxSizeBytes(300L * 1024 * 1024)
                     .build()
             }
             .components {
