@@ -350,9 +350,9 @@ fun PhotoDetailScreen(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    Color.Black.copy(alpha = 0.50f),
+                                    Color.Black.copy(alpha = 0.60f),
                                     Color.Black.copy(alpha = 0.20f),
-                                    Color.Black.copy(alpha = 0.60f)
+                                    Color.Black.copy(alpha = 0.90f)
                                 )
                             )
                         )
@@ -676,15 +676,6 @@ fun PhotoDetailScreen(
                 )
             }
         }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .height(48.dp)
-                .background(Color.Black)
-        )
     }
 }
 
