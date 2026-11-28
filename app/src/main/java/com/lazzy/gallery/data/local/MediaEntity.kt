@@ -34,7 +34,8 @@ data class MediaEntity(
     val isFavorite: Boolean = false,
     val isTrashed: Boolean = false,
     val isHidden: Boolean = false,
-    val ocrText: String? = null
+    val ocrText: String? = null,
+    val pHash: Long = 0L
 ) {
     fun toMediaModel(): MediaModel {
         return MediaModel(

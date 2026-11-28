@@ -106,6 +106,9 @@ interface MediaDao {
     @Query("UPDATE media_index SET ocrText = :text WHERE id = :id")
     suspend fun updateOcrText(id: Long, text: String)
 
+    @Query("UPDATE media_index SET pHash = :hash WHERE id = :id")
+    suspend fun updatePHash(id: Long, hash: Long)
+
     @Query("SELECT COUNT(*) FROM media_index WHERE ocrText IS NOT NULL AND ocrText != ''")
     suspend fun getOcrIndexedCount(): Int
 

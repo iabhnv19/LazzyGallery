@@ -1271,49 +1271,22 @@ class MediaRepository(context: Context) {
 
         val hashedItems = mutableListOf<Pair<MediaModel, Long>>()
         var scanned = 0
-        val batchSize = 16
-
-        for (chunk in allMedia.chunked(batchSize)) {
-            val openPfds = mutableListOf<Pair<com.lazzy.gallery.data.local.MediaEntity, android.os.ParcelFileDescriptor>>()
-            try {
-                for (item in chunk) {
-                    try {
-                        val pfd = context.contentResolver.openFileDescriptor(Uri.parse(item.uriString), "r")
-                        if (pfd != null) {
-                            openPfds.add(item to pfd)
-                        } else {
-                            scanned++
-                        }
-                    } catch (_: Throwable) {
-                        scanned++
+        for (item in allMedia) {
+            var hash = item.pHash
+            if (hash == 0L) {
+                try {
+                    context.contentResolver.openFileDescriptor(Uri.parse(item.uriString), "r")?.use { pfd ->
+                        hash = RustBridge.nativeComputePHash(pfd.fd)
                     }
-                }
-
-                if (openPfds.isNotEmpty()) {
-                    val fds = IntArray(openPfds.size) { openPfds[it].second.fd }
-                    val hashes = RustBridge.nativeComputePHashesBatch(fds)
-                    if (hashes != null && hashes.size == openPfds.size) {
-                        for (idx in openPfds.indices) {
-                            val hash = hashes[idx]
-                            if (hash != 0L) {
-                                hashedItems.add(openPfds[idx].first.toMediaModel() to hash)
-                            }
-                        }
-                    } else {
-                        for ((entity, pfd) in openPfds) {
-                            val hash = RustBridge.nativeComputePHash(pfd.fd)
-                            if (hash != 0L) {
-                                hashedItems.add(entity.toMediaModel() to hash)
-                            }
-                        }
+                    if (hash != 0L) {
+                        mediaDao.updatePHash(item.id, hash)
                     }
-                    scanned += openPfds.size
-                }
-            } finally {
-                openPfds.forEach { (_, pfd) ->
-                    try { pfd.close() } catch (_: Throwable) { }
-                }
+                } catch (_: Throwable) { }
             }
+            if (hash != 0L) {
+                hashedItems.add(item.toMediaModel() to hash)
+            }
+            scanned++
             onProgress(scanned, total)
         }
 
