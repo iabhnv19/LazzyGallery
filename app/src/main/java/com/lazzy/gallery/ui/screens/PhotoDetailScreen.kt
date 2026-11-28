@@ -320,7 +320,11 @@ fun PhotoDetailScreen(
             enter = fadeIn(animationSpec = tween(1200)),
             exit = fadeOut(animationSpec = tween(400))
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .navigationBarsPadding()
+            ) {
                 val context = LocalContext.current
                 val ambientImageRequest = remember(currentMedia.uri) {
                     ImageRequest.Builder(context)
