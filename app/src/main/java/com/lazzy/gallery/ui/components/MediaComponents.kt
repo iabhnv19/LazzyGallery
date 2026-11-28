@@ -80,7 +80,7 @@ import java.util.Locale
 
 private val ThumbBoundsTransform = BoundsTransform { _, _ ->
     tween(
-        durationMillis = 300,
+        durationMillis = 420,
         easing = androidx.compose.animation.core.FastOutSlowInEasing
     )
 }

@@ -678,7 +678,7 @@ fun PhotoDetailScreen(
 
 private val DetailBoundsTransform = BoundsTransform { _, _ ->
     tween(
-        durationMillis = 300,
+        durationMillis = 420,
         easing = androidx.compose.animation.core.FastOutSlowInEasing
     )
 }

@@ -49,7 +49,7 @@ import com.lazzy.gallery.ui.viewmodel.MediaViewModel
 
 private val AlbumBoundsTransform = BoundsTransform { _, _ ->
     tween(
-        durationMillis = 300,
+        durationMillis = 420,
         easing = androidx.compose.animation.core.FastOutSlowInEasing
     )
 }

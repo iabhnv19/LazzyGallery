@@ -93,7 +93,7 @@ import java.util.Locale
 
 private val AlbumBoundsTransform = BoundsTransform { _, _ ->
     tween(
-        durationMillis = 300,
+        durationMillis = 420,
         easing = androidx.compose.animation.core.FastOutSlowInEasing
     )
 }
