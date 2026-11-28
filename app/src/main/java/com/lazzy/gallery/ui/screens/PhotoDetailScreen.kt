@@ -697,7 +697,6 @@ fun ZoomableImageViewer(
     val context = LocalContext.current
     var scale by remember(media.id) { mutableFloatStateOf(1f) }
     var offset by remember(media.id) { mutableStateOf(Offset.Zero) }
-    var regionBitmap by remember(media.id) { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(scale) {
         onZoomChanged(scale > 1.05f)
@@ -709,33 +708,6 @@ fun ZoomableImageViewer(
             scale = 1f
             offset = Offset.Zero
             onZoomChanged(false)
-        }
-    }
-
-    // Use a region decode for deep zoom to reduce memory use.
-    LaunchedEffect(scale, media.uri) {
-        if (scale > 2.0f && media.width > 0 && media.height > 0) {
-            withContext(Dispatchers.IO) {
-                try {
-                    context.contentResolver.openInputStream(media.uri)?.use { stream ->
-                        @Suppress("DEPRECATION")
-                        val decoder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            BitmapRegionDecoder.newInstance(stream)
-                        } else {
-                            BitmapRegionDecoder.newInstance(stream, false)
-                        }
-                        decoder?.let {
-                            val options = BitmapFactory.Options().apply {
-                                inSampleSize = if (scale > 3.5f) 1 else 2
-                            }
-                            val rect = AndroidRect(0, 0, media.width, media.height)
-                            regionBitmap = it.decodeRegion(rect, options)
-                        }
-                    }
-                } catch (_: Exception) { }
-            }
-        } else if (scale <= 1.2f) {
-            regionBitmap = null
         }
     }
 
@@ -784,53 +756,34 @@ fun ZoomableImageViewer(
             ),
         contentAlignment = Alignment.Center
     ) {
-        if (regionBitmap != null && scale > 2.0f) {
-            Image(
-                bitmap = regionBitmap!!.asImageBitmap(),
-                contentDescription = media.displayName,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(sharedModifier)
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale,
-                        rotationZ = rotationAngle,
-                        translationX = offset.x,
-                        translationY = offset.y
-                    ),
-                contentScale = ContentScale.Fit
-            )
-        } else {
-            val fullImageRequest = remember(media.uri, media.id) {
-                ImageRequest.Builder(context)
-                    .data(media.uri)
-                    .placeholderMemoryCacheKey("thumb_${media.id}")
-                    .memoryCacheKey("full_${media.id}")
-                    .diskCacheKey("full_${media.id}")
-                    // Normal pages use a screen-sized decode. Deep zoom uses the region decoder.
-                    .size(1920, 1920)
-                    .crossfade(false)
-                    .allowHardware(true)
-                    .diskCachePolicy(CachePolicy.ENABLED)
-                    .memoryCachePolicy(CachePolicy.ENABLED)
-                    .build()
-            }
-            AsyncImage(
-                model = fullImageRequest,
-                contentDescription = media.displayName,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(sharedModifier)
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale,
-                        rotationZ = rotationAngle,
-                        translationX = offset.x,
-                        translationY = offset.y
-                    ),
-                contentScale = ContentScale.Fit
-            )
+        val fullImageRequest = remember(media.uri, media.id) {
+            ImageRequest.Builder(context)
+                .data(media.uri)
+                .placeholderMemoryCacheKey("thumb_${media.id}")
+                .memoryCacheKey("full_${media.id}")
+                .diskCacheKey("full_${media.id}")
+                .size(coil.size.Size.ORIGINAL)
+                .crossfade(false)
+                .allowHardware(true)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .build()
         }
+        AsyncImage(
+            model = fullImageRequest,
+            contentDescription = media.displayName,
+            modifier = Modifier
+                .fillMaxSize()
+                .then(sharedModifier)
+                .graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    rotationZ = rotationAngle,
+                    translationX = offset.x,
+                    translationY = offset.y
+                ),
+            contentScale = ContentScale.Fit
+        )
     }
 }
 
