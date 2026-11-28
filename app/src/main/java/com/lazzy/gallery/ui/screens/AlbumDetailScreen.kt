@@ -37,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,9 +48,9 @@ import com.lazzy.gallery.ui.components.MediaGridThumbnail
 import com.lazzy.gallery.ui.viewmodel.MediaViewModel
 
 private val AlbumBoundsTransform = BoundsTransform { _, _ ->
-    spring<Rect>(
-        dampingRatio = 0.85f,
-        stiffness = 180f
+    tween(
+        durationMillis = 300,
+        easing = androidx.compose.animation.core.FastOutSlowInEasing
     )
 }
 

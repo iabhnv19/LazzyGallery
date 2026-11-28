@@ -677,9 +677,9 @@ fun PhotoDetailScreen(
 }
 
 private val DetailBoundsTransform = BoundsTransform { _, _ ->
-    spring<Rect>(
-        dampingRatio = 0.85f,
-        stiffness = 380f
+    tween(
+        durationMillis = 300,
+        easing = androidx.compose.animation.core.FastOutSlowInEasing
     )
 }
 

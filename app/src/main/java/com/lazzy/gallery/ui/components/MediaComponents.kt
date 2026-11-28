@@ -79,9 +79,9 @@ import com.lazzy.gallery.data.SortOrder
 import java.util.Locale
 
 private val ThumbBoundsTransform = BoundsTransform { _, _ ->
-    spring<Rect>(
-        dampingRatio = 0.85f,
-        stiffness = 380f
+    tween(
+        durationMillis = 300,
+        easing = androidx.compose.animation.core.FastOutSlowInEasing
     )
 }
 
