@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -95,7 +96,7 @@ fun RecentPhotosScreen(
     onMediaClick: (Long) -> Unit,
     onIntentSenderRequest: (PendingIntent) -> Unit
 ) {
-    val pagedItems = viewModel.pagedMediaItems.collectAsLazyPagingItems()
+    val mediaItems by viewModel.mediaItems.collectAsState()
     val isInitialLoadComplete by viewModel.isInitialLoadComplete.collectAsState()
     val selectedIds by viewModel.selectedIds.collectAsState()
     val isSelectionMode by viewModel.isSelectionMode.collectAsState()
@@ -206,7 +207,7 @@ fun RecentPhotosScreen(
                 Box(
                     modifier = Modifier.fillMaxSize()
             ) {
-                if (pagedItems.itemCount == 0 && pagedItems.loadState.refresh is androidx.paging.LoadState.NotLoading) {
+                if (mediaItems.isEmpty()) {
                     if (isInitialLoadComplete) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -225,9 +226,7 @@ fun RecentPhotosScreen(
 
                     LaunchedEffect(currentViewedId) {
                         currentViewedId?.let { id ->
-                            val index = (0 until pagedItems.itemCount).firstOrNull {
-                                pagedItems.peek(it)?.id == id
-                            } ?: -1
+                            val index = mediaItems.indexOfFirst { it.id == id }
                             if (index >= 0) {
                                 gridState.scrollToItem(index)
                             }
@@ -243,7 +242,7 @@ fun RecentPhotosScreen(
                                         if (dragStartIndex >= 0) {
                                             val start = min(dragStartIndex, idx)
                                             val end = max(dragStartIndex, idx)
-                                            val rangeIds = (start..end).mapNotNull { pagedItems.peek(it)?.id }.toSet()
+                                            val rangeIds = (start..end).mapNotNull { mediaItems.getOrNull(it)?.id }.toSet()
                                             val updated = if (isSelectingRange) {
                                                 initialSelectedIdsOnDrag + rangeIds
                                             } else {
@@ -297,7 +296,7 @@ fun RecentPhotosScreen(
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         dragStartIndex = startIdx
                                         initialSelectedIdsOnDrag = viewModel.selectedIds.value
-                                        val startItem = pagedItems.peek(startIdx)
+                                        val startItem = mediaItems.getOrNull(startIdx)
                                         if (startItem != null) {
                                             val willSelect = !initialSelectedIdsOnDrag.contains(startItem.id)
                                             isSelectingRange = willSelect
@@ -325,7 +324,7 @@ fun RecentPhotosScreen(
                                             if (currentIdx != null) {
                                                 val start = min(startIdx, currentIdx)
                                                 val end = max(startIdx, currentIdx)
-                                                val rangeIds = (start..end).mapNotNull { pagedItems.peek(it)?.id }.toSet()
+                                                val rangeIds = (start..end).mapNotNull { mediaItems.getOrNull(it)?.id }.toSet()
                                                 val newSelection = if (isSelectingRange) {
                                                     initialSelectedIdsOnDrag + rangeIds
                                                 } else {
@@ -379,37 +378,34 @@ fun RecentPhotosScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(
-                            count = pagedItems.itemCount,
-                            key = pagedItems.itemKey { it.id },
-                            contentType = pagedItems.itemContentType { if (it.isVideo) "video_thumbnail" else "photo_thumbnail" }
-                        ) { index ->
-                            val item = pagedItems[index]
-                            if (item != null) {
-                                val isSelected = selectedIds.contains(item.id)
-                                val onClick = remember(item.id, isSelectionMode) {
-                                    {
-                                        if (isSelectionMode) {
-                                            viewModel.toggleSelection(item.id)
-                                        } else {
-                                            viewModel.setCurrentViewedMediaId(item.id)
-                                            onMediaClick(item.id)
-                                        }
+                            mediaItems,
+                            key = { it.id },
+                            contentType = { if (it.isVideo) "video_thumbnail" else "photo_thumbnail" }
+                        ) { item ->
+                            val isSelected = selectedIds.contains(item.id)
+                            val onClick = remember(item.id, isSelectionMode) {
+                                {
+                                    if (isSelectionMode) {
+                                        viewModel.toggleSelection(item.id)
+                                    } else {
+                                        viewModel.setCurrentViewedMediaId(item.id)
+                                        onMediaClick(item.id)
                                     }
                                 }
-                                val onLongClick = remember(item.id) {
-                                    { viewModel.toggleSelection(item.id) }
-                                }
-                                MediaGridThumbnail(
-                                    media = item,
-                                    isSelected = isSelected,
-                                    isSelectionMode = isSelectionMode,
-                                    isTargetSharedItem = currentViewedId == item.id,
-                                    sharedTransitionScope = sharedTransitionScope,
-                                    animatedVisibilityScope = animatedVisibilityScope,
-                                    onClick = onClick,
-                                    onLongClick = onLongClick
-                                )
                             }
+                            val onLongClick = remember(item.id) {
+                                { viewModel.toggleSelection(item.id) }
+                            }
+                            MediaGridThumbnail(
+                                media = item,
+                                isSelected = isSelected,
+                                isSelectionMode = isSelectionMode,
+                                isTargetSharedItem = currentViewedId == item.id,
+                                sharedTransitionScope = sharedTransitionScope,
+                                animatedVisibilityScope = animatedVisibilityScope,
+                                onClick = onClick,
+                                onLongClick = onLongClick
+                            )
                         }
                     }
                 }
