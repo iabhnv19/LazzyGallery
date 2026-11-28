@@ -749,6 +749,8 @@ fun ZoomableImageViewer(
         }
     } else Modifier
 
+    val isZoomed = scale > 1.02f
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -765,17 +767,21 @@ fun ZoomableImageViewer(
                     }
                 )
             }
-            .pointerInput(media.id) {
-                detectTransformGestures(panZoomLock = false) { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
-                    if (scale > 1.02f) {
-                        offset += pan
-                    } else {
-                        scale = 1f
-                        offset = Offset.Zero
+            .then(
+                if (isZoomed) {
+                    Modifier.pointerInput(media.id, isZoomed) {
+                        detectTransformGestures(panZoomLock = true) { _, pan, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(1f, 5f)
+                            if (scale > 1.02f) {
+                                offset += pan
+                            } else {
+                                scale = 1f
+                                offset = Offset.Zero
+                            }
+                        }
                     }
-                }
-            },
+                } else Modifier
+            ),
         contentAlignment = Alignment.Center
     ) {
         if (regionBitmap != null && scale > 2.0f) {
