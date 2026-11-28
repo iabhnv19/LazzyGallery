@@ -115,7 +115,7 @@ fun MediaGridThumbnail(
     val imageRequest = remember(media.uri, media.id, media.isVideo) {
         ImageRequest.Builder(context)
             .data(media.uri)
-            .size(300, 300)
+            .size(200, 200)
             .memoryCacheKey("thumb_${media.id}")
             .diskCacheKey("thumb_${media.id}")
             .placeholderMemoryCacheKey("thumb_${media.id}")
