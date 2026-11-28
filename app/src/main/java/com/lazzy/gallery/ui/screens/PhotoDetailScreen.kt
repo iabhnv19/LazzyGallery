@@ -677,14 +677,6 @@ fun PhotoDetailScreen(
                 )
             }
         }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .windowInsetsBottomHeight(WindowInsets.navigationBars)
-                .background(Color.Black)
-        )
     }
 }
 
